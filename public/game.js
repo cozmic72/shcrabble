@@ -1537,6 +1537,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Main Menu button (only in game screen)
+  const mainMenuBtn = document.getElementById('main-menu-btn');
+  if (mainMenuBtn) {
+    mainMenuBtn.addEventListener('click', () => {
+      window.location.href = '/shcrabble/';
+    });
+  }
+
   // My Games menu buttons
   document.querySelectorAll('#my-games-menu-btn').forEach(btn => {
     btn.addEventListener('click', async () => {
