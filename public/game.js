@@ -8,6 +8,7 @@ let draggedTile = null;
 let draggedFromRack = false;
 let rackDragSource = null;
 let previousRackSize = 0;
+let previousRackState = []; // Track previous rack for animation
 let exchangeMode = false;
 let tilesToExchange = [];
 let currentVoteId = null;
@@ -527,25 +528,41 @@ function updateBoard() {
 
 function updateRack() {
   const rackDiv = document.getElementById('rack');
-  rackDiv.innerHTML = '';
-
   const myPlayer = gameState.players.find(p => p.id === playerId);
   if (!myPlayer || !myPlayer.rack) return;
 
-  const currentRackSize = myPlayer.rack.length;
+  // Build current visible rack (excluding placed tiles)
+  const visibleRack = myPlayer.rack
+    .map((tile, idx) => ({ tile, originalIndex: idx }))
+    .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
+
+  const currentRackSize = visibleRack.length;
   const hasNewTiles = currentRackSize > previousRackSize;
+  const numNewTiles = hasNewTiles ? currentRackSize - previousRackSize : 0;
 
-  myPlayer.rack.forEach((tile, idx) => {
-    // Skip tiles that have been placed on the board
-    const isPlaced = currentPlacements.some(p => p.rackIndex === idx);
-    if (isPlaced) return;
+  // Clear and rebuild rack
+  rackDiv.innerHTML = '';
 
+  visibleRack.forEach(({ tile, originalIndex }, displayIndex) => {
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
 
-    // Animate new tiles (tiles at the end of the rack after move submission)
-    if (hasNewTiles && idx >= previousRackSize) {
+    // Determine if this is a new tile (added at the beginning, pushing others right)
+    const isNewTile = hasNewTiles && displayIndex < numNewTiles;
+
+    // Determine if this is an existing tile that needs to slide right
+    const isShiftingTile = hasNewTiles && displayIndex >= numNewTiles;
+
+    if (isNewTile) {
       tileDiv.classList.add('new-tile');
+      // Stagger the animation for multiple new tiles
+      tileDiv.style.animationDelay = `${displayIndex * 0.1}s`;
+    } else if (isShiftingTile) {
+      tileDiv.classList.add('sliding');
+      // Calculate how far to slide from (in pixels)
+      const slideDistance = -60 * numNewTiles; // 50px tile + 10px gap
+      tileDiv.style.setProperty('--slide-from', `${slideDistance}px`);
+      tileDiv.style.animationDelay = `${displayIndex * 0.05}s`;
     }
 
     if (tile.isBlank) {
@@ -561,7 +578,7 @@ function updateRack() {
       tileDiv.appendChild(pointsSpan);
     }
 
-    tileDiv.dataset.index = idx;
+    tileDiv.dataset.index = originalIndex;
     tileDiv.dataset.letter = tile.letter;
     tileDiv.dataset.points = tile.points;
     tileDiv.dataset.isBlank = tile.isBlank;
@@ -569,24 +586,25 @@ function updateRack() {
     // In exchange mode, make tiles clickable to select
     if (exchangeMode) {
       tileDiv.style.cursor = 'pointer';
-      if (tilesToExchange.includes(idx)) {
+      if (tilesToExchange.includes(originalIndex)) {
         tileDiv.style.opacity = '0.5';
         tileDiv.style.border = '3px solid #667eea';
       }
-      tileDiv.addEventListener('click', () => toggleTileForExchange(idx));
+      tileDiv.addEventListener('click', () => toggleTileForExchange(originalIndex));
     } else {
       // Make tiles draggable in normal mode
       tileDiv.draggable = true;
       tileDiv.addEventListener('dragstart', handleDragStart);
       tileDiv.addEventListener('dragend', handleDragEnd);
       // Add double-click handler to place tile after last placement
-      tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(idx));
+      tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(originalIndex));
     }
 
     rackDiv.appendChild(tileDiv);
   });
 
   previousRackSize = currentRackSize;
+  previousRackState = visibleRack.map(({ tile }) => tile);
 
   // Make rack itself a drop zone for reordering
   rackDiv.addEventListener('dragover', handleRackDragOver);
@@ -1117,11 +1135,40 @@ function submitMove() {
 }
 
 function recallTiles() {
-  currentPlacements = [];
-  updateBoard();
-  updateGameUI();
-  showMessage(i18n.t('msgTilesRecalled'), '');
-  validateCurrentMove();
+  if (currentPlacements.length === 0) return;
+
+  // Find all placed tile elements on the board and animate them
+  const board = document.getElementById('board');
+  const placedTileElements = [];
+
+  currentPlacements.forEach(placement => {
+    const squares = board.querySelectorAll('.square');
+    squares.forEach(square => {
+      const row = parseInt(square.dataset.row);
+      const col = parseInt(square.dataset.col);
+      if (row === placement.row && col === placement.col) {
+        const tileEl = square.querySelector('.placed-tile');
+        if (tileEl) {
+          placedTileElements.push(tileEl);
+        }
+      }
+    });
+  });
+
+  // Animate tiles disappearing
+  placedTileElements.forEach((el, index) => {
+    el.classList.add('recalling');
+    el.style.animationDelay = `${index * 0.05}s`;
+  });
+
+  // Wait for animations to complete, then update state
+  setTimeout(() => {
+    currentPlacements = [];
+    updateBoard();
+    updateGameUI();
+    showMessage(i18n.t('msgTilesRecalled'), '');
+    validateCurrentMove();
+  }, 300 + (placedTileElements.length * 50));
 }
 
 function passTurn() {
