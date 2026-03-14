@@ -764,6 +764,8 @@ function selectBlankLetter(letter) {
 
   const { row, col, draggedTile, rackIndex } = pendingBlankPlacement;
 
+  console.log('[BLANK] Selected letter:', letter, 'for position:', row, col);
+
   // Add the placement with chosen letter
   currentPlacements.push({
     row,
@@ -774,11 +776,11 @@ function selectBlankLetter(letter) {
     rackIndex: rackIndex
   });
 
+  console.log('[BLANK] Current placements:', currentPlacements);
+
   // Clean up
   document.getElementById('blank-letter-dialog').style.display = 'none';
   pendingBlankPlacement = null;
-  draggedTile = null;
-  draggedFromRack = false;
 
   updateBoard();
   updateGameUI();
