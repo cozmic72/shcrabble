@@ -222,31 +222,31 @@ function initSocket() {
   });
 
   socket.on('player-disconnected', (data) => {
-    showMessage(`${data.playerName} disconnected`, 'info');
+    showMessage(i18n.t('playerDisconnected', { name: data.playerName }), 'info');
     gameState = data.gameState;
     updatePlayersList();
   });
 
   socket.on('player-reconnected', (data) => {
-    showMessage(`${data.playerName} reconnected`, 'success');
+    showMessage(i18n.t('playerReconnected', { name: data.playerName }), 'success');
     gameState = data.gameState;
     updatePlayersList();
   });
 
   socket.on('spectator-joined', (data) => {
-    showMessage(`${data.spectatorName} joined as spectator`, 'info');
+    showMessage(i18n.t('spectatorJoined', { name: data.spectatorName }), 'info');
     gameState.spectators = data.spectators;
     updatePlayersList();
   });
 
   socket.on('spectator-left', (data) => {
-    showMessage(`${data.spectatorName} left`, 'info');
+    showMessage(i18n.t('spectatorLeft', { name: data.spectatorName }), 'info');
     gameState.spectators = data.spectators;
     updatePlayersList();
   });
 
   socket.on('player-removed', (data) => {
-    showMessage(`${data.playerName} was removed from the game`, 'error');
+    showMessage(i18n.t('playerRemoved', { name: data.playerName }), 'error');
     gameState = data.gameState;
     updatePlayersList();
     updateBoard();
@@ -300,7 +300,7 @@ function initSocket() {
       console.log('[INVALID-WORD-PROMPT] User cancelled - re-enabling submit button');
       // User cancelled - re-enable submit button so they can recall tiles or try again
       document.getElementById('submit-move-btn').disabled = false;
-      showMessage('Move cancelled', 'info');
+      showMessage(i18n.t('moveCancelled'), 'info');
     }
   });
 }
@@ -410,7 +410,7 @@ function updatePlayersList() {
   document.querySelectorAll('.remove-player-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       const targetPlayerId = e.target.dataset.playerId;
-      if (confirm('Remove this player from the game?')) {
+      if (confirm(i18n.t('confirmRemovePlayer'))) {
         socket.emit('remove-player', { targetPlayerId });
       }
     });
@@ -763,12 +763,12 @@ function createGame() {
   const allowVoting = document.getElementById('allow-voting').checked;
 
   if (!name) {
-    alert('Please enter your name');
+    alert(i18n.t('enterYourName'));
     return;
   }
 
   if (rackSize < 5 || rackSize > 12) {
-    alert('Rack size must be between 5 and 12');
+    alert(i18n.t('rackSizeRange'));
     return;
   }
 
@@ -802,7 +802,7 @@ function createGame() {
     })
     .catch(err => {
       console.error('Error creating game:', err);
-      alert('Failed to create game');
+      alert(i18n.t('failedCreateGame'));
     });
 }
 
@@ -811,12 +811,12 @@ function joinGame() {
   let gameId = document.getElementById('game-id').value.trim();
 
   if (!name) {
-    alert('Please enter your name');
+    alert(i18n.t('enterYourName'));
     return;
   }
 
   if (!gameId) {
-    alert('Please enter a game ID');
+    alert(i18n.t('enterGameId'));
     return;
   }
 
@@ -834,7 +834,7 @@ function copyInviteLink() {
   const linkInput = document.getElementById('invite-link');
   linkInput.select();
   document.execCommand('copy');
-  showMessage('Link copied!', 'success');
+  showMessage(i18n.t('linkCopied'), 'success');
 }
 
 function showBlankLetterDialog() {
@@ -976,7 +976,7 @@ function handleTileDoubleClick(rackIndex) {
 
   const nextPos = getNextPlacementPosition();
   if (!nextPos) {
-    showMessage('Cannot determine where to place tile (place at least 2 tiles first)', 'info');
+    showMessage(i18n.t('cannotDeterminePlacement'), 'info');
     return;
   }
 
@@ -1050,7 +1050,7 @@ function validateCurrentMove() {
 
   if (wordsToCheck.size === 0) {
     submitBtn.disabled = true;
-    showMessage('Move must form at least one word', 'error');
+    showMessage(i18n.t('mustFormWord'), 'error');
     return;
   }
 
@@ -1081,7 +1081,7 @@ function validateCurrentMove() {
       if (allValid) {
         showMessage('', '');
       } else {
-        showMessage(`Warning: Invalid word(s): ${invalidWords.join(', ')}`, 'warning');
+        showMessage(i18n.t('invalidWords', { words: invalidWords.join(', ') }), 'warning');
       }
     }
   };
@@ -1132,7 +1132,7 @@ function submitMove() {
 
   // Disable submit button while waiting
   document.getElementById('submit-move-btn').disabled = true;
-  showMessage('Submitting move...', 'info');
+  showMessage(i18n.t('submittingMove'), 'info');
 }
 
 function recallTiles() {
@@ -1215,7 +1215,7 @@ function recallTiles() {
 }
 
 function passTurn() {
-  if (confirm('Are you sure you want to pass your turn?')) {
+  if (confirm(i18n.t('confirmPassTurn'))) {
     socket.emit('pass-turn');
   }
 }
@@ -1224,7 +1224,7 @@ function exchangeTilesClick() {
   if (exchangeMode) {
     // Execute exchange
     if (tilesToExchange.length === 0) {
-      showMessage('Select at least one tile to exchange', 'error');
+      showMessage(i18n.t('selectTilesToExchange'), 'error');
       return;
     }
 
@@ -1233,11 +1233,11 @@ function exchangeTilesClick() {
     tilesToExchange = [];
     document.getElementById('exchange-tiles-btn').textContent = i18n.t('exchangeTiles');
     document.getElementById('cancel-exchange-btn').style.display = 'none';
-    showMessage('Exchanging tiles...', 'info');
+    showMessage(i18n.t('exchangingTiles'), 'info');
   } else {
     // Enter exchange mode
     if (gameState.tilesRemaining < 7) {
-      showMessage('Cannot exchange - fewer than 7 tiles remaining in bag', 'error');
+      showMessage(i18n.t('cannotExchangeFewTiles'), 'error');
       return;
     }
     exchangeMode = true;
@@ -1245,7 +1245,7 @@ function exchangeTilesClick() {
     updateRack();
     document.getElementById('exchange-tiles-btn').textContent = 'Confirm Exchange';
     document.getElementById('cancel-exchange-btn').style.display = 'inline-block';
-    showMessage('Click tiles to select for exchange, then click Confirm Exchange', 'info');
+    showMessage(i18n.t('clickTilesToExchange'), 'info');
   }
 }
 
@@ -1269,14 +1269,14 @@ function toggleTileForExchange(index) {
 }
 
 function leaveGame() {
-  if (confirm('Leave this game? You can rejoin later with the same name.')) {
+  if (confirm(i18n.t('confirmLeaveGame'))) {
     // Disconnect and reload to lobby
     window.location.href = '/shcrabble/';
   }
 }
 
 function endGame() {
-  if (confirm('End the game now? Final scores will be calculated.')) {
+  if (confirm(i18n.t('confirmEndGame'))) {
     socket.emit('end-game');
   }
 }
