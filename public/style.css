@@ -179,18 +179,31 @@ body {
   color: #333;
 }
 
+.setting-item input,
 .setting-item select {
   width: 100%;
-  padding: 10px;
+  padding: 12px;
   border: 2px solid #e0e0e0;
   border-radius: 6px;
   font-size: 1em;
   background: white;
+  box-sizing: border-box;
 }
 
+.setting-item input:focus,
 .setting-item select:focus {
   outline: none;
   border-color: #667eea;
+}
+
+.setting-item input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+.setting-item input[type="number"]::-webkit-outer-spin-button,
+.setting-item input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .dialog-footer {
