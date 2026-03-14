@@ -110,7 +110,7 @@ class Game {
       id: playerId,
       name: playerName,
       score: 0,
-      rack: this.drawTiles(7),
+      rack: this.drawTiles(9),
       index: this.players.length,
       connected: true
     };
