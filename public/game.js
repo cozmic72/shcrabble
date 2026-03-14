@@ -189,7 +189,9 @@ function updatePlayersList() {
     const tilesLabel = i18n.t('tiles');
     const disconnectedLabel = player.connected ? '' : ' (disconnected)';
     const isOwner = player.id === gameState.ownerId ? ' 👑' : '';
-    const removeBtn = (gameState.ownerId === playerId && player.id !== playerId)
+    const canRemove = gameState.ownerId === playerId && player.id !== playerId;
+    console.log(`Player ${player.name}: ownerId=${gameState.ownerId}, myId=${playerId}, canRemove=${canRemove}`);
+    const removeBtn = canRemove
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
 
@@ -756,6 +758,13 @@ function toggleTileForExchange(index) {
   updateRack();
 }
 
+function leaveGame() {
+  if (confirm('Leave this game? You can rejoin later with the same name.')) {
+    // Disconnect and reload to lobby
+    window.location.href = '/shcrabble/';
+  }
+}
+
 function endGame() {
   if (confirm('End the game now? Final scores will be calculated.')) {
     socket.emit('end-game');
@@ -800,6 +809,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);
   document.getElementById('exchange-tiles-btn').addEventListener('click', exchangeTilesClick);
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
+  document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
 
   // Allow board squares to receive drops
