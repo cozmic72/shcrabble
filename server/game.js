@@ -280,6 +280,26 @@ class Game {
       throw new Error('Not your turn');
     }
 
+    // Validate player has all tiles in rack before placing
+    const missingTiles = [];
+    const tilesToRemove = [];
+    placements.forEach(p => {
+      const idx = player.rack.findIndex((t, i) => {
+        // Skip tiles we've already marked for removal
+        if (tilesToRemove.includes(i)) return false;
+        return (t.isBlank && p.isBlank) || (!t.isBlank && t.letter === p.letter);
+      });
+      if (idx < 0) {
+        missingTiles.push(p.isBlank ? '(blank)' : p.letter);
+      } else {
+        tilesToRemove.push(idx);
+      }
+    });
+
+    if (missingTiles.length > 0) {
+      throw new Error(`Player doesn't have tiles in rack: ${missingTiles.join(', ')}`);
+    }
+
     // Apply placements to board
     placements.forEach(p => {
       this.board[p.row][p.col].letter = p.letter;
@@ -287,15 +307,11 @@ class Game {
       this.board[p.row][p.col].points = p.points || 0;
     });
 
-    // Remove used tiles from rack (to be implemented fully)
-    // For now, simplified
-    placements.forEach(p => {
-      const idx = player.rack.findIndex(t =>
-        (t.isBlank && p.isBlank) || (!t.isBlank && t.letter === p.letter)
-      );
-      if (idx >= 0) {
-        player.rack.splice(idx, 1);
-      }
+    // Remove used tiles from rack (now validated)
+    // Sort in descending order to avoid index shifting issues
+    tilesToRemove.sort((a, b) => b - a);
+    tilesToRemove.forEach(idx => {
+      player.rack.splice(idx, 1);
     });
 
     // Refill rack

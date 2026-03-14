@@ -13,6 +13,7 @@ let tilesToExchange = [];
 let currentVoteId = null;
 let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
 let pendingBlankPlacement = null; // Stores pending blank tile placement data
+let lastPlacementPosition = null; // Track last tile placement for double-click continuation
 
 // All Shavian letters for blank tile selection
 // First 40 letters in Unicode order (4 rows of 10)
@@ -578,6 +579,8 @@ function updateRack() {
       tileDiv.draggable = true;
       tileDiv.addEventListener('dragstart', handleDragStart);
       tileDiv.addEventListener('dragend', handleDragEnd);
+      // Add double-click handler to place tile after last placement
+      tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(idx));
     }
 
     rackDiv.appendChild(tileDiv);
@@ -853,6 +856,119 @@ function selectBlankLetter(letter) {
   // Clean up
   document.getElementById('blank-letter-dialog').style.display = 'none';
   pendingBlankPlacement = null;
+
+  updateBoard();
+  updateGameUI();
+  validateCurrentMove();
+}
+
+// Find next unambiguous position after last placement for double-click
+function getNextPlacementPosition() {
+  if (currentPlacements.length === 0) return null;
+
+  // Determine if placements are horizontal or vertical
+  if (currentPlacements.length === 1) {
+    // With only one tile, check if it extends an existing word
+    const p = currentPlacements[0];
+    const hasLeftNeighbor = p.col > 0 && gameState.board[p.row][p.col - 1].letter;
+    const hasRightNeighbor = p.col < 14 && gameState.board[p.row][p.col + 1].letter;
+    const hasTopNeighbor = p.row > 0 && gameState.board[p.row - 1][p.col].letter;
+    const hasBottomNeighbor = p.row < 14 && gameState.board[p.row + 1][p.col].letter;
+
+    // If tile is part of horizontal word, continue horizontally
+    if (hasLeftNeighbor || hasRightNeighbor) {
+      const nextCol = p.col + 1;
+      if (nextCol <= 14 && !gameState.board[p.row][nextCol].letter) {
+        return { row: p.row, col: nextCol };
+      }
+    }
+
+    // If tile is part of vertical word, continue vertically
+    if (hasTopNeighbor || hasBottomNeighbor) {
+      const nextRow = p.row + 1;
+      if (nextRow <= 14 && !gameState.board[nextRow][p.col].letter) {
+        return { row: nextRow, col: p.col };
+      }
+    }
+
+    // Otherwise ambiguous
+    return null;
+  }
+
+  // Check if all placements are in same row (horizontal) or same column (vertical)
+  const rows = currentPlacements.map(p => p.row);
+  const cols = currentPlacements.map(p => p.col);
+  const allSameRow = rows.every(r => r === rows[0]);
+  const allSameCol = cols.every(c => c === cols[0]);
+
+  if (!allSameRow && !allSameCol) {
+    // Placements are neither all horizontal nor all vertical - ambiguous
+    return null;
+  }
+
+  // Sort placements by position
+  const sorted = [...currentPlacements].sort((a, b) => {
+    if (allSameRow) return a.col - b.col;
+    return a.row - b.row;
+  });
+
+  const last = sorted[sorted.length - 1];
+
+  // Calculate next position
+  let nextRow, nextCol;
+  if (allSameRow) {
+    nextRow = last.row;
+    nextCol = last.col + 1;
+  } else {
+    nextRow = last.row + 1;
+    nextCol = last.col;
+  }
+
+  // Check if next position is valid and empty
+  if (nextRow > 14 || nextCol > 14) return null;
+  if (gameState.board[nextRow][nextCol].letter) return null;
+  if (currentPlacements.find(p => p.row === nextRow && p.col === nextCol)) return null;
+
+  return { row: nextRow, col: nextCol };
+}
+
+// Handle double-click on rack tile
+function handleTileDoubleClick(rackIndex) {
+  if (gameState.currentPlayerIndex !== playerIndex) {
+    showMessage(i18n.t('errorNotYourTurn'), 'error');
+    return;
+  }
+
+  const nextPos = getNextPlacementPosition();
+  if (!nextPos) {
+    showMessage('Cannot determine where to place tile (place at least 2 tiles first)', 'info');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  const tile = myPlayer.rack[rackIndex];
+
+  // If it's a blank tile, show letter selection dialog
+  if (tile.isBlank) {
+    pendingBlankPlacement = {
+      row: nextPos.row,
+      col: nextPos.col,
+      draggedTile: { ...tile, rackIndex },
+      rackIndex
+    };
+    showBlankLetterDialog();
+    return;
+  }
+
+  // Add placement
+  currentPlacements.push({
+    row: nextPos.row,
+    col: nextPos.col,
+    letter: tile.letter,
+    points: tile.points,
+    isBlank: false,
+    rackIndex: rackIndex
+  });
 
   updateBoard();
   updateGameUI();
