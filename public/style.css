@@ -238,22 +238,31 @@ body {
 .letter-option {
   width: 60px;
   height: 60px;
-  font-size: 2em;
+  font-size: 1.8em;
   font-family: 'Noto Sans Shavian', sans-serif;
-  border: 2px solid #667eea;
-  border-radius: 8px;
-  background: white;
+  font-weight: bold;
+  background: linear-gradient(135deg, #f5e5a3 0%, #f0e68c 50%, #e6d77a 100%);
+  border: 2px solid #daa520;
+  border-radius: 4px;
   cursor: pointer;
-  transition: all 0.2s;
+  user-select: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s, box-shadow 0.1s;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
 }
 
 .letter-option:hover {
-  background: #667eea;
-  color: white;
-  transform: scale(1.1);
+  transform: scale(1.05);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.letter-option:active {
+  transform: scale(0.98);
 }
 
 .checkbox-label input[type="checkbox"] {
