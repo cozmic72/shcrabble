@@ -110,7 +110,7 @@ User=$SERVICE_USER
 WorkingDirectory=$INSTALL_DIR
 Environment="NODE_ENV=production"
 Environment="PORT=$NODE_PORT"
-Environment="DB_HOST=localhost"
+Environment="DB_HOST=127.0.0.1"
 Environment="DB_USER=$DB_USER"
 Environment="DB_PASSWORD=$DB_PASSWORD"
 Environment="DB_NAME=$DB_NAME"
