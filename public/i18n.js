@@ -4,6 +4,7 @@ class I18n {
     this.currentLang = localStorage.getItem('shcrabble-lang') || 'en';
     this.translations = {};
     this.aboutContent = {};
+    this.welcomeContent = {};
   }
 
   async init() {
@@ -12,6 +13,8 @@ class I18n {
     await this.loadLanguage('shaw');
     await this.loadAbout('en');
     await this.loadAbout('shaw');
+    await this.loadWelcome('en');
+    await this.loadWelcome('shaw');
   }
 
   async loadLanguage(lang) {
@@ -29,6 +32,15 @@ class I18n {
       this.aboutContent[lang] = await response.text();
     } catch (err) {
       console.error(`Failed to load about content for ${lang}:`, err);
+    }
+  }
+
+  async loadWelcome(lang) {
+    try {
+      const response = await fetch(`/shcrabble/i18n/welcome-${lang}.html`);
+      this.welcomeContent[lang] = await response.text();
+    } catch (err) {
+      console.error(`Failed to load welcome content for ${lang}:`, err);
     }
   }
 
@@ -55,6 +67,10 @@ class I18n {
 
   getAbout() {
     return this.aboutContent[this.currentLang] || '';
+  }
+
+  getWelcome() {
+    return this.welcomeContent[this.currentLang] || '';
   }
 
   updateAllText() {

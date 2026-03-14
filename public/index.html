@@ -39,6 +39,26 @@
     </div>
   </div>
 
+  <!-- Welcome Dialog -->
+  <div id="welcome-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-large">
+      <div class="dialog-header">
+        <h2>Welcome!</h2>
+        <button class="close-dialog" data-dialog="welcome-dialog" aria-label="Close">×</button>
+      </div>
+      <div id="welcome-content">
+        <!-- Loaded dynamically from i18n -->
+      </div>
+      <div class="dialog-footer">
+        <label class="checkbox-label">
+          <input type="checkbox" id="dont-show-welcome">
+          <span data-i18n="dontShowAgain">Don't show this again</span>
+        </label>
+        <button id="welcome-close-btn" class="primary-btn" data-i18n="close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Burger Menu -->
     <div id="burger-menu">

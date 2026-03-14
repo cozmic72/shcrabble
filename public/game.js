@@ -566,11 +566,27 @@ document.addEventListener('DOMContentLoaded', () => {
     i18n.setLanguage(e.target.value);
   });
 
+  // Welcome dialog handlers
+  document.getElementById('welcome-close-btn').addEventListener('click', () => {
+    const dontShow = document.getElementById('dont-show-welcome').checked;
+    if (dontShow) {
+      localStorage.setItem('shcrabble-hide-welcome', 'true');
+    }
+    document.getElementById('welcome-dialog').style.display = 'none';
+  });
+
   // Initialize i18n
   i18n.init().then(() => {
     // Set current language in dropdown
     document.getElementById('language-select').value = i18n.getLanguage();
     // Update all text
     i18n.updateAllText();
+
+    // Show welcome dialog on first visit
+    const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
+    if (!hideWelcome) {
+      document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
+      document.getElementById('welcome-dialog').style.display = 'flex';
+    }
   });
 });
