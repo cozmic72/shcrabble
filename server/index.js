@@ -256,24 +256,25 @@ io.on('connection', (socket) => {
 
       if (invalidWords.length > 0) {
         // Invalid words found
-        if (game.allowVoting) {
-          // Ask player if they want to put it to a vote
-          const score = game.calculateScore(placements);
-
-          socket.emit('invalid-word-prompt', {
-            invalidWords,
-            placements,
-            score
-          });
-
-          console.log(`Invalid words detected: ${invalidWords.join(', ')}, asking player to confirm vote`);
-        } else {
-          // Voting disabled - reject the move
+        // In single player mode or when voting is disabled, reject the move
+        if (game.players.length === 1 || !game.allowVoting) {
           socket.emit('error', {
             message: `Invalid words: ${invalidWords.join(', ')}`
           });
-          console.log(`Invalid words detected: ${invalidWords.join(', ')}, move rejected (voting disabled)`);
+          console.log(`Invalid words detected: ${invalidWords.join(', ')}, move rejected (single player or voting disabled)`);
+          return;
         }
+
+        // Multi-player with voting enabled - ask player if they want to put it to a vote
+        const score = game.calculateScore(placements);
+
+        socket.emit('invalid-word-prompt', {
+          invalidWords,
+          placements,
+          score
+        });
+
+        console.log(`Invalid words detected: ${invalidWords.join(', ')}, asking player to confirm vote`);
         return;
       }
 
