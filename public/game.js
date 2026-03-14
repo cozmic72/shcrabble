@@ -12,6 +12,17 @@ let exchangeMode = false;
 let tilesToExchange = [];
 let currentVoteId = null;
 let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
+let pendingBlankPlacement = null; // Stores pending blank tile placement data
+
+// All Shavian letters for blank tile selection
+const SHAVIAN_LETTERS = [
+  '𐑐', '𐑑', '𐑒', '𐑓', '𐑔', '𐑕', '𐑖',
+  '𐑗', '𐑘', '𐑙', '𐑚', '𐑛', '𐑜', '𐑝',
+  '𐑟', '𐑠', '𐑡', '𐑢', '𐑣', '𐑤', '𐑥',
+  '𐑦', '𐑧', '𐑨', '𐑩', '𐑪', '𐑫', '𐑬',
+  '𐑭', '𐑮', '𐑯', '𐑰', '𐑱', '𐑲', '𐑳',
+  '𐑴', '𐑵', '𐑶', '𐑷', '𐑺', '𐑻'
+];
 
 // Save user preferences
 function saveUserName(name) {
@@ -732,6 +743,48 @@ function copyInviteLink() {
   showMessage('Link copied!', 'success');
 }
 
+function showBlankLetterDialog() {
+  const letterGrid = document.getElementById('letter-grid');
+  letterGrid.innerHTML = '';
+
+  // Create buttons for each letter
+  SHAVIAN_LETTERS.forEach(letter => {
+    const btn = document.createElement('button');
+    btn.className = 'letter-option';
+    btn.textContent = letter;
+    btn.addEventListener('click', () => selectBlankLetter(letter));
+    letterGrid.appendChild(btn);
+  });
+
+  document.getElementById('blank-letter-dialog').style.display = 'flex';
+}
+
+function selectBlankLetter(letter) {
+  if (!pendingBlankPlacement) return;
+
+  const { row, col, draggedTile, rackIndex } = pendingBlankPlacement;
+
+  // Add the placement with chosen letter
+  currentPlacements.push({
+    row,
+    col,
+    letter: letter,
+    points: 0, // Blank tiles are worth 0 points
+    isBlank: true,
+    rackIndex: rackIndex
+  });
+
+  // Clean up
+  document.getElementById('blank-letter-dialog').style.display = 'none';
+  pendingBlankPlacement = null;
+  draggedTile = null;
+  draggedFromRack = false;
+
+  updateBoard();
+  updateGameUI();
+  validateCurrentMove();
+}
+
 function validateCurrentMove() {
   const submitBtn = document.getElementById('submit-move-btn');
   const messageArea = document.getElementById('message-area');
@@ -1048,25 +1101,25 @@ document.addEventListener('DOMContentLoaded', () => {
       rackIndex = draggedTile.rackIndex;
     }
 
-    // If it's a blank tile, prompt for letter choice
-    let chosenLetter = draggedTile.letter;
+    // If it's a blank tile, show letter selection dialog
     if (draggedTile.isBlank) {
-      chosenLetter = prompt('Choose a letter for the blank tile (enter a Shavian character):');
-      if (!chosenLetter) {
-        // User cancelled
-        return;
-      }
-      // Trim to first character
-      chosenLetter = [...chosenLetter][0] || '';
+      pendingBlankPlacement = {
+        row,
+        col,
+        draggedTile,
+        rackIndex
+      };
+      showBlankLetterDialog();
+      return;
     }
 
-    // Add new placement
+    // Add new placement (non-blank)
     currentPlacements.push({
       row,
       col,
-      letter: chosenLetter,
-      points: draggedTile.isBlank ? 0 : draggedTile.points,
-      isBlank: draggedTile.isBlank,
+      letter: draggedTile.letter,
+      points: draggedTile.points,
+      isBlank: false,
       rackIndex: rackIndex
     });
 
