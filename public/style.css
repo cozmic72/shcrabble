@@ -796,6 +796,14 @@ body {
   pointer-events: none;
 }
 
+.rack-tile.rack-gap {
+  opacity: 0 !important;
+  pointer-events: none;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
 .rack-tile .tile-points {
   position: absolute;
   bottom: 2px;

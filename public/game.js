@@ -531,38 +531,50 @@ function updateRack() {
   const myPlayer = gameState.players.find(p => p.id === playerId);
   if (!myPlayer || !myPlayer.rack) return;
 
-  // Build current visible rack (excluding placed tiles)
-  const visibleRack = myPlayer.rack
-    .map((tile, idx) => ({ tile, originalIndex: idx }))
-    .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
+  // Build rack including gaps for placed tiles
+  const fullRack = myPlayer.rack.map((tile, idx) => {
+    const isPlaced = currentPlacements.some(p => p.rackIndex === idx);
+    return { tile, originalIndex: idx, isPlaced };
+  });
 
-  const currentRackSize = visibleRack.length;
+  const currentRackSize = fullRack.filter(item => !item.isPlaced).length;
   const hasNewTiles = currentRackSize > previousRackSize;
   const numNewTiles = hasNewTiles ? currentRackSize - previousRackSize : 0;
 
   // Clear and rebuild rack
   rackDiv.innerHTML = '';
 
-  visibleRack.forEach(({ tile, originalIndex }, displayIndex) => {
+  let visibleIndex = 0;
+  fullRack.forEach(({ tile, originalIndex, isPlaced }) => {
+    if (isPlaced) {
+      // Create an invisible gap placeholder
+      const gapDiv = document.createElement('div');
+      gapDiv.className = 'rack-tile rack-gap';
+      gapDiv.style.opacity = '0';
+      gapDiv.style.pointerEvents = 'none';
+      rackDiv.appendChild(gapDiv);
+      return;
+    }
+
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
 
     // Determine if this is a new tile (added at the beginning, pushing others right)
-    const isNewTile = hasNewTiles && displayIndex < numNewTiles;
+    const isNewTile = hasNewTiles && visibleIndex < numNewTiles;
 
     // Determine if this is an existing tile that needs to slide right
-    const isShiftingTile = hasNewTiles && displayIndex >= numNewTiles;
+    const isShiftingTile = hasNewTiles && visibleIndex >= numNewTiles;
 
     if (isNewTile) {
       tileDiv.classList.add('new-tile');
       // Stagger the animation for multiple new tiles
-      tileDiv.style.animationDelay = `${displayIndex * 0.1}s`;
+      tileDiv.style.animationDelay = `${visibleIndex * 0.1}s`;
     } else if (isShiftingTile) {
       tileDiv.classList.add('sliding');
       // Calculate how far to slide from (in pixels)
       const slideDistance = -60 * numNewTiles; // 50px tile + 10px gap
       tileDiv.style.setProperty('--slide-from', `${slideDistance}px`);
-      tileDiv.style.animationDelay = `${displayIndex * 0.05}s`;
+      tileDiv.style.animationDelay = `${visibleIndex * 0.05}s`;
     }
 
     if (tile.isBlank) {
@@ -601,10 +613,11 @@ function updateRack() {
     }
 
     rackDiv.appendChild(tileDiv);
+    visibleIndex++;
   });
 
   previousRackSize = currentRackSize;
-  previousRackState = visibleRack.map(({ tile }) => tile);
+  previousRackState = fullRack.filter(item => !item.isPlaced).map(({ tile }) => tile);
 
   // Make rack itself a drop zone for reordering
   rackDiv.addEventListener('dragover', handleRackDragOver);
