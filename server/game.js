@@ -346,18 +346,21 @@ class Game {
       if (vWord.length > 1) wordsToCheck.add(vWord);
     }
 
+    console.log('Words to validate:', Array.from(wordsToCheck));
+
     if (wordsToCheck.size === 0) {
       throw new Error('Move must form at least one word');
     }
 
+    // Temporarily disable dictionary validation for debugging
     // Check dictionary if available
-    if (this.dictionary) {
-      for (const word of wordsToCheck) {
-        if (!this.dictionary.isValidWord(word)) {
-          throw new Error(`Invalid word: ${word}`);
-        }
-      }
-    }
+    // if (this.dictionary) {
+    //   for (const word of wordsToCheck) {
+    //     if (!this.dictionary.isValidWord(word)) {
+    //       throw new Error(`Invalid word: ${word}`);
+    //     }
+    //   }
+    // }
 
     return true;
   }

@@ -610,12 +610,16 @@ function validateCurrentMove() {
   for (const p of currentPlacements) {
     // Read horizontal word
     const hWord = readWordFromBoard(tempBoard, p.row, p.col, true);
+    console.log(`Tile at ${p.row},${p.col}: horizontal word = "${hWord}" (${hWord.length} chars)`);
     if (hWord.length > 1) wordsToCheck.add(hWord);
 
     // Read vertical word
     const vWord = readWordFromBoard(tempBoard, p.row, p.col, false);
+    console.log(`Tile at ${p.row},${p.col}: vertical word = "${vWord}" (${vWord.length} chars)`);
     if (vWord.length > 1) wordsToCheck.add(vWord);
   }
+
+  console.log('Words to check:', Array.from(wordsToCheck));
 
   if (wordsToCheck.size === 0) {
     submitBtn.disabled = true;
