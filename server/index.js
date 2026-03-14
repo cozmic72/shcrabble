@@ -184,8 +184,7 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // New player joining
-      const playerId = uuidv4();
+      // New player joining (playerId already declared above)
       const player = game.addPlayer(playerId, playerName);
 
       // Save player to database
