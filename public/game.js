@@ -9,6 +9,7 @@ let draggedFromRack = false;
 let rackDragSource = null;
 let previousRackSize = 0;
 let previousRackState = []; // Track previous rack for animation
+let isRecalling = false; // Flag to prevent slide-in animation during recall
 let exchangeMode = false;
 let tilesToExchange = [];
 let currentVoteId = null;
@@ -537,7 +538,7 @@ function updateRack() {
     .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
 
   const currentRackSize = visibleRack.length;
-  const hasNewTiles = currentRackSize > previousRackSize;
+  const hasNewTiles = !isRecalling && currentRackSize > previousRackSize;
   const numNewTiles = hasNewTiles ? currentRackSize - previousRackSize : 0;
 
   // Clear and rebuild rack
@@ -548,6 +549,7 @@ function updateRack() {
     tileDiv.className = 'rack-tile';
 
     // Determine if this is a new tile (added at the beginning, pushing others right)
+    // Only animate slide-in if not recalling
     const isNewTile = hasNewTiles && displayIndex < numNewTiles;
 
     // Determine if this is an existing tile that needs to slide right
@@ -1137,6 +1139,9 @@ function submitMove() {
 function recallTiles() {
   if (currentPlacements.length === 0) return;
 
+  // Set flag to prevent slide-in animation
+  isRecalling = true;
+
   const board = document.getElementById('board');
   const rack = document.getElementById('rack');
   const rackRect = rack.getBoundingClientRect();
@@ -1159,14 +1164,19 @@ function recallTiles() {
 
           // Create a flying clone
           const clone = tileEl.cloneNode(true);
+          clone.className = 'rack-tile'; // Use rack-tile styling for proper appearance
+          if (placement.isBlank) {
+            clone.classList.add('blank');
+          }
           clone.style.position = 'fixed';
           clone.style.left = tileRect.left + 'px';
           clone.style.top = tileRect.top + 'px';
-          clone.style.width = tileRect.width + 'px';
-          clone.style.height = tileRect.height + 'px';
+          clone.style.width = '50px';
+          clone.style.height = '50px';
           clone.style.margin = '0';
           clone.style.zIndex = '10000';
-          clone.style.transition = `all 0.4s ease-out`;
+          clone.style.pointerEvents = 'none';
+          clone.style.transition = `transform 0.4s ease-out, opacity 0.4s ease-out`;
           clone.style.transitionDelay = `${index * 0.05}s`;
           document.body.appendChild(clone);
 
@@ -1198,6 +1208,10 @@ function recallTiles() {
     updateGameUI();
     showMessage(i18n.t('msgTilesRecalled'), '');
     validateCurrentMove();
+    // Clear recall flag after a brief delay to ensure animations don't trigger
+    setTimeout(() => {
+      isRecalling = false;
+    }, 100);
   }, longestDelay);
 }
 
