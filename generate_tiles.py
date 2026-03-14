@@ -40,6 +40,14 @@ READLEX_PATH = '../shavian-info/readlex/readlex.json'
 OUTPUT_PATH = 'data/tiles.csv'
 USE_WORD_FREQUENCY = True  # Weight by word frequency
 
+# Gameplay tuning
+MAX_TILES_PER_LETTER = 6  # Prevent any single letter from dominating
+CONSONANT_BOOST = 1.15  # Boost consonant counts by 15%
+
+# Shavian consonants and vowels
+CONSONANTS = set('𐑐𐑚𐑑𐑛𐑒𐑜𐑓𐑝𐑔𐑞𐑕𐑟𐑖𐑠𐑗𐑡𐑘𐑢𐑣𐑤𐑮𐑥𐑯𐑙')
+VOWELS = set('𐑦𐑰𐑧𐑱𐑨𐑲𐑩𐑳𐑴𐑪𐑵𐑶𐑷𐑭𐑺𐑻𐑫𐑬')
+
 
 def split_compounds(text):
     """Replace compound letters with their split forms."""
@@ -105,12 +113,17 @@ def calculate_tile_distribution(letter_counts):
     # Available tiles (excluding blanks)
     available_tiles = TOTAL_TILES - BLANK_TILES
 
-    # Calculate raw tile counts based on frequency
+    # Calculate raw tile counts based on frequency with consonant boost
     tile_distribution = {}
     for letter, count in letter_counts.items():
         frequency = count / total_letters
         # Scale to available tiles
         raw_count = frequency * available_tiles
+
+        # Boost consonants to prevent vowel-heavy hands
+        if letter in CONSONANTS:
+            raw_count *= CONSONANT_BOOST
+
         tile_distribution[letter] = raw_count
 
     # Round to integers while maintaining total
@@ -140,6 +153,23 @@ def calculate_tile_distribution(letter_counts):
         if tile_counts[letter] < 1:
             tile_counts[letter] = 1
 
+    # Apply maximum cap per letter to prevent dominance
+    redistributed = 0
+    for letter in list(tile_counts.keys()):
+        if tile_counts[letter] > MAX_TILES_PER_LETTER:
+            excess = tile_counts[letter] - MAX_TILES_PER_LETTER
+            tile_counts[letter] = MAX_TILES_PER_LETTER
+            redistributed += excess
+
+    # Redistribute capped tiles to letters with fewer tiles
+    if redistributed > 0:
+        # Give to letters with fewest tiles (but not already at max)
+        sorted_by_count = sorted(tile_counts.items(), key=lambda x: x[1])
+        for i in range(int(redistributed)):
+            letter, count = sorted_by_count[i % len(sorted_by_count)]
+            if tile_counts[letter] < MAX_TILES_PER_LETTER:
+                tile_counts[letter] += 1
+
     # Adjust if we exceeded total
     current_total = sum(tile_counts.values())
     if current_total > available_tiles:
@@ -150,6 +180,14 @@ def calculate_tile_distribution(letter_counts):
             letter, count = sorted_letters[i]
             if count > 1:
                 tile_counts[letter] -= 1
+    elif current_total < available_tiles:
+        # Add to least common letters
+        sorted_letters = sorted(tile_counts.items(), key=lambda x: x[1])
+        deficit = available_tiles - current_total
+        for i in range(deficit):
+            letter, count = sorted_letters[i % len(sorted_letters)]
+            if tile_counts[letter] < MAX_TILES_PER_LETTER:
+                tile_counts[letter] += 1
 
     return tile_counts
 
