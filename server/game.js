@@ -585,6 +585,9 @@ class Game {
 
   // Get game state for client
   getState(forPlayerId = null) {
+    // Spectators have forPlayerId === null and should see all racks
+    const isSpectator = forPlayerId === null;
+
     return {
       gameId: this.gameId,
       board: this.board,
@@ -594,8 +597,8 @@ class Game {
         score: p.score,
         rackCount: p.rack.length,
         connected: p.connected,
-        // Only send rack to the player themselves
-        rack: forPlayerId === p.id ? p.rack : undefined
+        // Send rack to the player themselves OR to spectators
+        rack: (forPlayerId === p.id || isSpectator) ? p.rack : undefined
       })),
       spectators: this.spectators.map(s => ({
         id: s.id,

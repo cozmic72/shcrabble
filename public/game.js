@@ -500,6 +500,12 @@ function updatePlayersList() {
       ${removeBtn}
     `;
 
+    // Allow spectators to click to view player's tiles
+    if (playerIndex === null) {
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', () => showPlayerTiles(player));
+    }
+
     playersList.appendChild(card);
   });
 
@@ -1701,6 +1707,49 @@ function showGameEndedDialog(finalScores) {
     scoresDiv.appendChild(scoreEntry);
   });
 
+  dialog.style.display = 'flex';
+}
+
+function showPlayerTiles(player) {
+  // Only spectators can view other players' tiles
+  if (playerIndex !== null) return;
+
+  const dialog = document.getElementById('player-tiles-dialog');
+  const nameElement = document.getElementById('player-tiles-name');
+  const rackElement = document.getElementById('player-tiles-rack');
+
+  // Set player name
+  nameElement.textContent = `${player.name}'s Tiles`;
+
+  // Clear and populate rack
+  rackElement.innerHTML = '';
+
+  if (!player.rack || player.rack.length === 0) {
+    rackElement.innerHTML = '<p style="color: #666;">No tiles</p>';
+  } else {
+    player.rack.forEach(tile => {
+      const tileDiv = document.createElement('div');
+      tileDiv.className = 'rack-tile';
+      tileDiv.style.cursor = 'default'; // Not draggable
+
+      if (tile.isBlank) {
+        tileDiv.classList.add('blank');
+        tileDiv.textContent = '?';
+      } else {
+        tileDiv.textContent = tile.letter;
+
+        // Add points display
+        const pointsSpan = document.createElement('span');
+        pointsSpan.className = 'tile-points';
+        pointsSpan.textContent = tile.points;
+        tileDiv.appendChild(pointsSpan);
+      }
+
+      rackElement.appendChild(tileDiv);
+    });
+  }
+
+  // Show dialog
   dialog.style.display = 'flex';
 }
 

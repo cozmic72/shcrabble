@@ -571,10 +571,11 @@ io.on('connection', (socket) => {
         message: `Waiting for other players to vote on: ${invalidWords.join(', ')}`
       });
 
-      // Ask other players to vote
+      // Ask other players and spectators to vote
       const sockets = await io.in(gameId).fetchSockets();
       for (const s of sockets) {
-        if (s.data.playerId !== playerId && !s.data.isSpectator) {
+        // Send to all players except the one who made the move, and all spectators
+        if (s.data.playerId !== playerId) {
           s.emit('vote-request', {
             voteId,
             playerName: player.name,
@@ -607,14 +608,17 @@ io.on('connection', (socket) => {
 
       const game = games.get(gameId);
       const otherPlayers = game.players.filter(p => p.id !== vote.playerId);
-      const allVoted = otherPlayers.every(p => vote.votes.has(p.id));
 
-      console.log(`Vote received: ${accept ? 'accept' : 'reject'} from ${playerId}, ${vote.votes.size}/${otherPlayers.length} votes`);
+      // Count total eligible voters (other players + spectators)
+      const totalVoters = otherPlayers.length + game.spectators.length;
+      const allVoted = vote.votes.size >= totalVoters;
+
+      console.log(`Vote received: ${accept ? 'accept' : 'reject'} from ${playerId}, ${vote.votes.size}/${totalVoters} votes`);
 
       if (allVoted) {
-        // Tally votes - accept if at least one player voted yes
+        // Tally votes - accept if majority voted yes (>50%)
         const acceptVotes = Array.from(vote.votes.values()).filter(v => v).length;
-        const accepted = acceptVotes > 0;
+        const accepted = acceptVotes > (totalVoters / 2);
 
         console.log(`Vote complete: ${acceptVotes} accept votes, ${accepted ? 'ACCEPTED' : 'REJECTED'}`);
 

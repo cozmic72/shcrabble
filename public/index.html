@@ -96,6 +96,21 @@
     </div>
   </div>
 
+  <!-- Player Tiles Dialog (for spectators) -->
+  <div id="player-tiles-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 id="player-tiles-name"></h2>
+        <button class="close-dialog" data-dialog="player-tiles-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <div id="player-tiles-rack" style="display: flex; gap: 10px; justify-content: center; padding: 20px; background: white; border-radius: 6px;">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Welcome Dialog -->
   <div id="welcome-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog dialog-large">
