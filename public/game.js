@@ -11,34 +11,6 @@ let previousRackSize = 0;
 let exchangeMode = false;
 let tilesToExchange = [];
 
-// Get or create persistent user ID
-function getUserId() {
-  let userId = localStorage.getItem('shcrabble-userId');
-  if (!userId) {
-    userId = crypto.randomUUID();
-    localStorage.setItem('shcrabble-userId', userId);
-  }
-  return userId;
-}
-
-// Debug function: Become owner (call from console)
-window.becomeOwner = function() {
-  if (!gameState) {
-    console.log('Not in a game');
-    return;
-  }
-
-  const currentOwnerId = gameState.ownerId;
-  console.log(`Current owner ID: ${currentOwnerId}`);
-  console.log(`Your player ID: ${playerId}`);
-
-  // Update localStorage to match owner ID
-  localStorage.setItem('shcrabble-userId', currentOwnerId);
-
-  console.log('Updated your userId to match owner. Reload the page and rejoin to become owner.');
-  console.log('Run: window.location.reload()');
-}
-
 // Save user preferences
 function saveUserName(name) {
   localStorage.setItem('shcrabble-userName', name);
@@ -583,8 +555,7 @@ function createGame() {
       // Auto-join the game
       socket.emit('join-game', {
         gameId: data.gameId,
-        playerName: name,
-        userId: getUserId()
+        playerName: name
       });
     })
     .catch(err => {
@@ -618,8 +589,7 @@ function joinGame() {
 
   socket.emit('join-game', {
     gameId: gameId,
-    playerName: name,
-    userId: getUserId()
+    playerName: name
   });
 }
 

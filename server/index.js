@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Join game
-  socket.on('join-game', async ({ gameId, playerName, userId }) => {
+  socket.on('join-game', async ({ gameId, playerName }) => {
     try {
       let game = games.get(gameId);
 
@@ -87,16 +87,12 @@ io.on('connection', (socket) => {
         games.set(gameId, game);
       }
 
-      // Use userId if provided, otherwise generate new ID
-      const playerId = userId || uuidv4();
-
-      // Check if this is a reconnection (by userId or by name)
-      const existingPlayer = game.players.find(p =>
-        p.id === playerId || p.name.toLowerCase() === playerName.toLowerCase()
-      );
+      // Check if this is a reconnection (by name)
+      const existingPlayer = game.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
 
       if (existingPlayer) {
-        // Reconnect existing player
+        // Reconnect existing player with new ID
+        const playerId = uuidv4();
         const player = game.reconnectPlayer(playerId, playerName);
 
         if (!player) {
@@ -104,7 +100,7 @@ io.on('connection', (socket) => {
           return;
         }
 
-        console.log(`Player ${playerName} reconnected with ID ${playerId}, ownerId is ${game.ownerId}`);
+        console.log(`Player ${playerName} reconnected with new ID ${playerId}, ownerId is ${game.ownerId}`);
 
         // Update player ID in database
         await db.query(
@@ -186,12 +182,13 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // New player joining (playerId already declared above)
+      // New player joining
+      const playerId = uuidv4();
       const player = game.addPlayer(playerId, playerName);
 
-      // Save player to database (replace if already exists)
+      // Save player to database
       await db.query(
-        'REPLACE INTO players (id, session_id, player_name, player_index) VALUES (?, ?, ?, ?)',
+        'INSERT INTO players (id, session_id, player_name, player_index) VALUES (?, ?, ?, ?)',
         [playerId, gameId, playerName, player.index]
       );
 

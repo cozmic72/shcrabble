@@ -131,26 +131,21 @@ class Game {
 
   // Reconnect existing player
   reconnectPlayer(playerId, playerName) {
-    // Find by ID first, then by name
-    const player = this.players.find(p => p.id === playerId || p.name === playerName);
+    const player = this.players.find(p => p.name === playerName);
     if (!player) {
       return null;
     }
 
     const oldId = player.id;
-    const oldName = player.name;
 
-    // Update player ID, name, and mark as connected
+    // Update player ID and mark as connected
     player.id = playerId;
-    player.name = playerName;
     player.connected = true;
 
-    // If this player was the owner and ID changed, update ownerId
-    if (this.ownerId === oldId && oldId !== playerId) {
+    // If this player was the owner, update ownerId
+    if (this.ownerId === oldId) {
       this.ownerId = playerId;
     }
-
-    console.log(`Reconnected player: old(id=${oldId}, name=${oldName}) -> new(id=${playerId}, name=${playerName})`);
 
     return player;
   }
