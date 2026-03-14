@@ -289,15 +289,32 @@ class Game {
       }
     }
 
-    // Validate all words formed
-    const words = this.getFormedWords(placements);
-    if (words.length === 0) {
+    // Temporarily place tiles to check words
+    const tempBoard = JSON.parse(JSON.stringify(this.board));
+    placements.forEach(p => {
+      tempBoard[p.row][p.col].letter = p.letter;
+    });
+
+    // Check horizontal and vertical word for each placed tile
+    const wordsToCheck = new Set();
+
+    for (const p of placements) {
+      // Check horizontal word
+      const hWord = this.readWord(tempBoard, p.row, p.col, true);
+      if (hWord.length > 1) wordsToCheck.add(hWord);
+
+      // Check vertical word
+      const vWord = this.readWord(tempBoard, p.row, p.col, false);
+      if (vWord.length > 1) wordsToCheck.add(vWord);
+    }
+
+    if (wordsToCheck.size === 0) {
       throw new Error('Move must form at least one word');
     }
 
     // Check dictionary if available
     if (this.dictionary) {
-      for (const word of words) {
+      for (const word of wordsToCheck) {
         if (!this.dictionary.isValidWord(word)) {
           throw new Error(`Invalid word: ${word}`);
         }
@@ -307,80 +324,12 @@ class Game {
     return true;
   }
 
-  // Get all words formed by placements
-  getFormedWords(placements) {
-    // Temporarily place tiles on board
-    const tempBoard = JSON.parse(JSON.stringify(this.board));
-    placements.forEach(p => {
-      tempBoard[p.row][p.col].letter = p.letter;
-    });
-
-    const words = [];
-    const isHorizontal = placements.every(p => p.row === placements[0].row);
-
-    if (isHorizontal) {
-      // Main horizontal word
-      const row = placements[0].row;
-      const cols = placements.map(p => p.col).sort((a, b) => a - b);
-      const minCol = cols[0];
-      const maxCol = cols[cols.length - 1];
-
-      // Extend to include adjacent tiles
-      let startCol = minCol;
-      let endCol = maxCol;
-
-      while (startCol > 0 && tempBoard[row][startCol - 1].letter) startCol--;
-      while (endCol < 14 && tempBoard[row][endCol + 1].letter) endCol++;
-
-      // Build main word
-      let word = '';
-      for (let col = startCol; col <= endCol; col++) {
-        word += tempBoard[row][col].letter || '';
-      }
-      if (word.length > 1) words.push(word);
-
-      // Check perpendicular words for each placement
-      placements.forEach(p => {
-        const perpendicularWord = this.getPerpendicularWord(tempBoard, p.row, p.col, false);
-        if (perpendicularWord.length > 1) words.push(perpendicularWord);
-      });
-    } else {
-      // Main vertical word
-      const col = placements[0].col;
-      const rows = placements.map(p => p.row).sort((a, b) => a - b);
-      const minRow = rows[0];
-      const maxRow = rows[rows.length - 1];
-
-      // Extend to include adjacent tiles
-      let startRow = minRow;
-      let endRow = maxRow;
-
-      while (startRow > 0 && tempBoard[startRow - 1][col].letter) startRow--;
-      while (endRow < 14 && tempBoard[endRow + 1][col].letter) endRow++;
-
-      // Build main word
-      let word = '';
-      for (let row = startRow; row <= endRow; row++) {
-        word += tempBoard[row][col].letter || '';
-      }
-      if (word.length > 1) words.push(word);
-
-      // Check perpendicular words for each placement
-      placements.forEach(p => {
-        const perpendicularWord = this.getPerpendicularWord(tempBoard, p.row, p.col, true);
-        if (perpendicularWord.length > 1) words.push(perpendicularWord);
-      });
-    }
-
-    return words;
-  }
-
-  // Get perpendicular word at position
-  getPerpendicularWord(board, row, col, isVertical) {
+  // Read word horizontally or vertically from a position
+  readWord(board, row, col, horizontal) {
     let word = '';
 
-    if (isVertical) {
-      // Check horizontally
+    if (horizontal) {
+      // Find start and end of word
       let startCol = col;
       let endCol = col;
 
@@ -391,7 +340,7 @@ class Game {
         word += board[row][c].letter || '';
       }
     } else {
-      // Check vertically
+      // Find start and end of word
       let startRow = row;
       let endRow = row;
 
