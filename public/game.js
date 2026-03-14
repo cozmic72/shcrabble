@@ -868,30 +868,46 @@ function getNextPlacementPosition() {
 
   // Determine if placements are horizontal or vertical
   if (currentPlacements.length === 1) {
-    // With only one tile, check if it extends an existing word
+    // With only one tile, check if it's adjacent to an existing board tile
     const p = currentPlacements[0];
     const hasLeftNeighbor = p.col > 0 && gameState.board[p.row][p.col - 1].letter;
     const hasRightNeighbor = p.col < 14 && gameState.board[p.row][p.col + 1].letter;
     const hasTopNeighbor = p.row > 0 && gameState.board[p.row - 1][p.col].letter;
     const hasBottomNeighbor = p.row < 14 && gameState.board[p.row + 1][p.col].letter;
 
-    // If tile is part of horizontal word, continue horizontally
-    if (hasLeftNeighbor || hasRightNeighbor) {
+    const hasHorizontalNeighbor = hasLeftNeighbor || hasRightNeighbor;
+    const hasVerticalNeighbor = hasTopNeighbor || hasBottomNeighbor;
+
+    // If tile is adjacent horizontally, continue horizontally
+    if (hasHorizontalNeighbor && !hasVerticalNeighbor) {
       const nextCol = p.col + 1;
       if (nextCol <= 14 && !gameState.board[p.row][nextCol].letter) {
         return { row: p.row, col: nextCol };
       }
     }
 
-    // If tile is part of vertical word, continue vertically
-    if (hasTopNeighbor || hasBottomNeighbor) {
+    // If tile is adjacent vertically, continue vertically
+    if (hasVerticalNeighbor && !hasHorizontalNeighbor) {
       const nextRow = p.row + 1;
       if (nextRow <= 14 && !gameState.board[nextRow][p.col].letter) {
         return { row: nextRow, col: p.col };
       }
     }
 
-    // Otherwise ambiguous
+    // If adjacent both ways, prefer horizontal (arbitrary but consistent choice)
+    if (hasHorizontalNeighbor && hasVerticalNeighbor) {
+      const nextCol = p.col + 1;
+      if (nextCol <= 14 && !gameState.board[p.row][nextCol].letter) {
+        return { row: p.row, col: nextCol };
+      }
+      // If can't go right, try down
+      const nextRow = p.row + 1;
+      if (nextRow <= 14 && !gameState.board[nextRow][p.col].letter) {
+        return { row: nextRow, col: p.col };
+      }
+    }
+
+    // Otherwise ambiguous (no neighbors)
     return null;
   }
 
