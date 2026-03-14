@@ -374,6 +374,13 @@ function initSocket() {
     showMessage(data.message, data.accepted ? 'success' : 'error');
     currentVoteId = null;
 
+    // If vote was rejected, clear current placements and re-enable submit button
+    // so player can recall tiles or modify their move
+    if (!data.accepted && currentPlacements.length > 0) {
+      // Don't clear placements - let player recall or modify them
+      document.getElementById('submit-move-btn').disabled = false;
+    }
+
     // Play appropriate vote result sound
     if (window.sounds) {
       if (data.accepted) {

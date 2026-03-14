@@ -659,21 +659,10 @@ io.on('connection', (socket) => {
             });
           }
         } else {
-          // Reject the move - undo placement
-          const player = game.players.find(p => p.id === vote.playerId);
-
-          // Return tiles to rack
-          vote.placements.forEach(p => {
-            const idx = player.rack.findIndex(t =>
-              (t.isBlank && p.isBlank) || (!t.isBlank && t.letter === p.letter)
-            );
-            // Tiles were already removed, need to add them back
-            player.rack.push({
-              letter: p.letter,
-              points: p.points,
-              isBlank: p.isBlank
-            });
-          });
+          // Reject the move
+          // Note: Tiles were never placed on the board or removed from rack,
+          // so we don't need to do anything to the game state.
+          // The tiles are still in the player's rack.
 
           // Notify all players
           const sockets = await io.in(gameId).fetchSockets();
