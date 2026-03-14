@@ -312,8 +312,9 @@ io.on('connection', (socket) => {
         games.set(gameId, game);
       }
 
-      // Check if this is a reconnection (by name)
+      // Check if this is a reconnection (by name) - check both players and spectators
       const existingPlayer = game.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+      const existingSpectator = game.spectators.find(s => s.name.toLowerCase() === playerName.toLowerCase());
 
       if (existingPlayer) {
         // Reconnect existing player with new ID
@@ -365,6 +366,38 @@ io.on('connection', (socket) => {
         }
 
         console.log(`Player ${playerName} reconnected to game ${gameId}`);
+        return;
+      }
+
+      if (existingSpectator) {
+        // Reconnect existing spectator with new ID
+        const spectatorId = uuidv4();
+
+        // Update spectator ID in the game state
+        existingSpectator.id = spectatorId;
+
+        // Update game state
+        await db.query(
+          'UPDATE sessions SET game_state = ? WHERE id = ?',
+          [game.serialize(), gameId]
+        );
+
+        // Join socket room
+        socket.join(gameId);
+        socket.data.gameId = gameId;
+        socket.data.playerId = spectatorId;
+        socket.data.isSpectator = true;
+
+        // Send reconnection confirmation
+        socket.emit('joined', {
+          playerId: spectatorId,
+          playerIndex: null,
+          gameState: game.getState(null),
+          isSpectator: true,
+          reconnected: true
+        });
+
+        console.log(`Spectator ${playerName} reconnected to game ${gameId}`);
         return;
       }
 
