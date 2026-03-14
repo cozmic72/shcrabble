@@ -141,6 +141,24 @@
     </div>
   </div>
 
+  <!-- Game Created Dialog (Invite Link) -->
+  <div id="game-created-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 data-i18n="gameCreated">Game Created!</h2>
+        <button class="close-dialog" data-dialog="game-created-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <p data-i18n="shareLink">Share this link with other players:</p>
+        <div class="invite-link">
+          <input type="text" id="invite-link" readonly>
+          <button id="copy-link-btn" data-i18n="copyBtn">Copy</button>
+        </div>
+        <p class="waiting-message" data-i18n="waitingForPlayers">Waiting for players to join...</p>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Landing/Lobby Screen -->
     <div id="lobby-screen">
@@ -160,16 +178,6 @@
       <div id="lobby-options">
         <button id="create-game-btn" class="lobby-btn primary-btn" data-i18n="createGameBtn">Create Game</button>
         <button id="join-game-btn" class="lobby-btn" data-i18n="joinGameBtn">Join Game</button>
-      </div>
-
-      <div id="invite-link-container" style="display: none;">
-        <h3 data-i18n="gameCreated">Game Created!</h3>
-        <p data-i18n="shareLink">Share this link with other players:</p>
-        <div class="invite-link">
-          <input type="text" id="invite-link" readonly>
-          <button id="copy-link-btn" data-i18n="copyBtn">Copy</button>
-        </div>
-        <p class="waiting-message" data-i18n="waitingForPlayers">Waiting for players to join...</p>
       </div>
     </div>
 

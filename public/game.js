@@ -682,7 +682,7 @@ function createGame() {
 
       const inviteLink = window.location.origin + data.inviteLink;
       document.getElementById('invite-link').value = inviteLink;
-      document.getElementById('invite-link-container').style.display = 'block';
+      document.getElementById('game-created-dialog').style.display = 'flex';
 
       // Auto-join the game
       socket.emit('join-game', {
