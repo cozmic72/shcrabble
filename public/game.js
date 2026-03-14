@@ -1327,10 +1327,11 @@ async function showMyGamesDialog() {
       const statusColor = game.status === 'active' ? '#4caf50' : '#ff9800';
       const isYourTurn = game.currentTurn === playerName;
       const turnIndicator = isYourTurn ? ' 🟢 Your turn!' : '';
+      const activeIndicator = game.isActive ? '' : ' 💤 (No one connected)';
 
       gameDiv.innerHTML = `
         <div style="font-weight: bold; margin-bottom: 5px;">
-          <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...
+          <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...${activeIndicator}
         </div>
         <div style="font-size: 0.9em; color: #666;">
           Players: ${game.players.join(', ')}

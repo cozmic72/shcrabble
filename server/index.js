@@ -47,19 +47,47 @@ app.get('/shcrabble/api/health', (req, res) => {
 app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
   try {
     const playerName = decodeURIComponent(req.params.playerName);
-
-    // Get all active games from memory
     const myGames = [];
+    const seenGameIds = new Set();
+
+    // First, get all active games from memory
     for (const [gameId, game] of games.entries()) {
       const player = game.players.find(p => p.name === playerName);
       if (player) {
+        seenGameIds.add(gameId);
         myGames.push({
           id: gameId,
           status: game.status,
           players: game.players.map(p => p.name),
           currentTurn: game.players[game.currentPlayerIndex]?.name,
-          tilesRemaining: game.tileBag ? game.tileBag.length : 0
+          tilesRemaining: game.tileBag ? game.tileBag.length : 0,
+          isActive: true
         });
+      }
+    }
+
+    // Then, check database for games not in memory (all players disconnected)
+    const dbRows = await db.query('SELECT id, game_state, status FROM sessions WHERE status != ?', ['completed']);
+    for (const row of dbRows) {
+      if (seenGameIds.has(row.id)) continue; // Already got this one from memory
+
+      try {
+        // Check if this game has the player
+        const gameState = JSON.parse(row.game_state);
+        const hasPlayer = gameState.players && gameState.players.some(p => p.name === playerName);
+
+        if (hasPlayer) {
+          myGames.push({
+            id: row.id,
+            status: row.status,
+            players: gameState.players.map(p => p.name),
+            currentTurn: gameState.players[gameState.currentPlayerIndex]?.name,
+            tilesRemaining: gameState.tileBag ? gameState.tileBag.length : 0,
+            isActive: false // No one connected
+          });
+        }
+      } catch (e) {
+        console.error(`Error parsing game state for ${row.id}:`, e);
       }
     }
 
