@@ -381,6 +381,7 @@ function handleSquareClick(row, col) {
     currentPlacements.splice(existingIdx, 1);
     updateBoard();
     updateGameUI();
+    validateCurrentMove();
     return;
   }
 
@@ -525,6 +526,106 @@ function copyInviteLink() {
   showMessage('Link copied!', 'success');
 }
 
+function validateCurrentMove() {
+  const submitBtn = document.getElementById('submit-move-btn');
+  const messageArea = document.getElementById('message-area');
+
+  if (currentPlacements.length === 0) {
+    submitBtn.disabled = true;
+    return;
+  }
+
+  // Create temporary board with current placements
+  const tempBoard = JSON.parse(JSON.stringify(gameState.board));
+  currentPlacements.forEach(p => {
+    tempBoard[p.row][p.col] = {
+      letter: p.letter,
+      points: p.points,
+      isBlank: p.isBlank
+    };
+  });
+
+  // Read horizontal and vertical word for each placed tile
+  const wordsToCheck = new Set();
+
+  for (const p of currentPlacements) {
+    // Read horizontal word
+    const hWord = readWordFromBoard(tempBoard, p.row, p.col, true);
+    if (hWord.length > 1) wordsToCheck.add(hWord);
+
+    // Read vertical word
+    const vWord = readWordFromBoard(tempBoard, p.row, p.col, false);
+    if (vWord.length > 1) wordsToCheck.add(vWord);
+  }
+
+  if (wordsToCheck.size === 0) {
+    submitBtn.disabled = true;
+    showMessage('Move must form at least one word', 'error');
+    return;
+  }
+
+  // Check each word via server
+  let validationsPending = wordsToCheck.size;
+  let allValid = true;
+  const invalidWords = [];
+
+  wordsToCheck.forEach(word => {
+    socket.emit('validate-word', { word });
+  });
+
+  // Listen for validation responses
+  const validationHandler = (data) => {
+    validationsPending--;
+
+    if (!data.isValid) {
+      allValid = false;
+      invalidWords.push(data.word);
+    }
+
+    if (validationsPending === 0) {
+      socket.off('word-validated', validationHandler);
+
+      if (allValid) {
+        submitBtn.disabled = false;
+        showMessage('', '');
+      } else {
+        submitBtn.disabled = true;
+        showMessage(`Invalid word(s): ${invalidWords.join(', ')}`, 'error');
+      }
+    }
+  };
+
+  socket.on('word-validated', validationHandler);
+}
+
+function readWordFromBoard(board, row, col, horizontal) {
+  let word = '';
+
+  if (horizontal) {
+    let startCol = col;
+    let endCol = col;
+
+    while (startCol > 0 && board[row][startCol - 1].letter) startCol--;
+    while (endCol < 14 && board[row][endCol + 1].letter) endCol++;
+
+    for (let c = startCol; c <= endCol; c++) {
+      word += board[row][c].letter || '';
+    }
+  } else {
+    let startRow = row;
+    let endRow = row;
+
+    while (startRow > 0 && board[startRow - 1][col].letter) startRow--;
+    while (endRow < 14 && board[endRow + 1][col].letter) endRow++;
+
+    for (let r = startRow; r <= endRow; r++) {
+      word += board[r][col].letter || '';
+    }
+  }
+
+  return word;
+}
+
 function submitMove() {
   if (currentPlacements.length === 0) {
     showMessage(i18n.t('errorNoTilesPlaced'), 'error');
@@ -544,6 +645,7 @@ function recallTiles() {
   updateBoard();
   updateGameUI();
   showMessage(i18n.t('msgTilesRecalled'), '');
+  validateCurrentMove();
 }
 
 function passTurn() {
@@ -641,6 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
     draggedFromRack = false;
     updateBoard();
     updateGameUI();
+    validateCurrentMove();
   });
 
   // Burger menu handlers
