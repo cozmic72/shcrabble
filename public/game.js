@@ -209,7 +209,29 @@ function initSocket() {
 
   socket.on('game-update', (data) => {
     console.log('[GAME-UPDATE]', data);
+
+    // Preserve local rack order before updating game state
+    const myPlayer = gameState?.players?.find(p => p.id === playerId);
+    const previousRackOrder = myPlayer?.rack ? [...myPlayer.rack] : null;
+
     gameState = data.gameState;
+
+    // Restore local rack order if the rack contents haven't changed
+    if (previousRackOrder) {
+      const newPlayer = gameState.players.find(p => p.id === playerId);
+      if (newPlayer && newPlayer.rack) {
+        // Check if rack has same tiles (might be in different order from server)
+        const sameContents = previousRackOrder.length === newPlayer.rack.length &&
+          previousRackOrder.every(tile =>
+            newPlayer.rack.some(t => t.letter === tile.letter && t.points === tile.points && t.isBlank === tile.isBlank)
+          );
+
+        if (sameContents) {
+          // Rack hasn't changed, restore local order
+          newPlayer.rack = previousRackOrder;
+        }
+      }
+    }
 
     // Switch to game screen when game becomes active
     if (gameState.status === 'active' && document.getElementById('lobby-screen').style.display !== 'none') {
