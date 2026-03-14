@@ -34,6 +34,7 @@ class Game {
     this.dictionary = dictionary; // Reference to dictionary for word validation
     this.rackSize = options.rackSize || 9; // Customizable rack size
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
+    this.customTiles = options.customTiles || null; // Custom tile distribution
   }
 
   // Load tile definitions and metadata from CSV (without initializing tileBag)
@@ -63,9 +64,22 @@ class Game {
     });
   }
 
-  // Load tiles from CSV
+  // Load tiles from CSV or custom distribution
   loadTiles() {
-    this.loadTileInfo();
+    // Use custom tiles if provided, otherwise load from CSV
+    if (this.customTiles) {
+      this.tiles = this.customTiles.map(t => ({
+        letter: t.letter,
+        points: t.points,
+        count: t.count,
+        isBlank: t.letter === 'blank'
+      }));
+      this.allLetters = this.tiles
+        .filter(t => t.letter !== 'blank')
+        .map(t => t.letter);
+    } else {
+      this.loadTileInfo();
+    }
 
     this.tileBag = [];
 
@@ -608,7 +622,8 @@ class Game {
       turnsTaken: this.turnsTaken,
       ownerId: this.ownerId,
       rackSize: this.rackSize,
-      allowVoting: this.allowVoting
+      allowVoting: this.allowVoting,
+      customTiles: this.customTiles
     });
   }
 
@@ -619,7 +634,8 @@ class Game {
 
     const options = {
       rackSize: state.rackSize || 9,
-      allowVoting: state.allowVoting !== undefined ? state.allowVoting : true
+      allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
+      customTiles: state.customTiles || null
     };
 
     const game = new Game(gameId, dictionary, options);

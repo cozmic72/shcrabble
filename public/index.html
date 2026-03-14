@@ -138,9 +138,57 @@
             <span>Allow voting on invalid words</span>
           </label>
         </div>
+        <div class="setting-item">
+          <label>Tile Distribution</label>
+          <div style="display: flex; gap: 20px; margin-top: 5px;">
+            <label class="radio-label">
+              <input type="radio" name="tile-distribution" value="default" checked>
+              <span>Default</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="tile-distribution" value="custom">
+              <span>Custom</span>
+            </label>
+          </div>
+          <button id="edit-tiles-btn" style="margin-top: 10px; display: none;">Edit Tile Distribution</button>
+        </div>
       </div>
       <div class="dialog-footer">
         <button id="create-game-confirm-btn" class="primary-btn">Create Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Tile Editor Dialog -->
+  <div id="tile-editor-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-large">
+      <div class="dialog-header">
+        <h2>Custom Tile Distribution</h2>
+        <button class="close-dialog" data-dialog="tile-editor-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <p>Total tiles: <strong id="total-tiles-count">100</strong></p>
+        <div id="tile-editor-table-container" style="max-height: 400px; overflow-y: auto; margin: 10px 0;">
+          <table id="tile-editor-table" style="width: 100%; border-collapse: collapse;">
+            <thead style="position: sticky; top: 0; background: white;">
+              <tr>
+                <th style="padding: 8px; border: 1px solid #ddd;">Letter</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">Count</th>
+                <th style="padding: 8px; border: 1px solid #ddd;">Points</th>
+              </tr>
+            </thead>
+            <tbody id="tile-editor-body">
+              <!-- Populated by JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="dialog-footer" style="display: flex; gap: 10px; justify-content: space-between;">
+        <button id="export-csv-btn">Export as CSV</button>
+        <div style="display: flex; gap: 10px;">
+          <button id="reset-tiles-btn">Reset to Default</button>
+          <button id="save-tiles-btn" class="primary-btn">Save</button>
+        </div>
       </div>
     </div>
   </div>

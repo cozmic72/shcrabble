@@ -258,9 +258,9 @@ app.post('/shcrabble/api/delete-games', async (req, res) => {
 app.post('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const { rackSize = 9, allowVoting = true } = req.body;
+    const { rackSize = 9, allowVoting = true, customTiles = null } = req.body;
 
-    const game = new Game(gameId, dictionary, { rackSize, allowVoting });
+    const game = new Game(gameId, dictionary, { rackSize, allowVoting, customTiles });
 
     // Store in memory
     games.set(gameId, game);

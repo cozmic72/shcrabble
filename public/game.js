@@ -970,6 +970,7 @@ function createGame() {
   const name = document.getElementById('create-name').value.trim();
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
+  const customTileDistribution = getSelectedTileDistribution();
 
   if (!name) {
     alert(i18n.t('enterYourName'));
@@ -990,7 +991,8 @@ function createGame() {
     },
     body: JSON.stringify({
       rackSize,
-      allowVoting
+      allowVoting,
+      customTiles: customTileDistribution
     })
   })
     .then(res => res.json())
@@ -1973,6 +1975,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
+  // Custom tile distribution handlers
+  setupCustomTileEditor();
+
   // Initialize i18n
   i18n.init().then(() => {
     // Set current language in dropdown
@@ -1981,3 +1986,173 @@ document.addEventListener('DOMContentLoaded', () => {
     i18n.updateAllText();
   });
 });
+
+// Custom Tile Distribution
+const DEFAULT_TILES = [
+  { letter: '𐑐', count: 2, points: 1 },
+  { letter: '𐑑', count: 5, points: 1 },
+  { letter: '𐑒', count: 3, points: 1 },
+  { letter: '𐑓', count: 2, points: 1 },
+  { letter: '𐑔', count: 2, points: 2 },
+  { letter: '𐑕', count: 5, points: 1 },
+  { letter: '𐑖', count: 2, points: 1 },
+  { letter: '𐑗', count: 1, points: 2 },
+  { letter: '𐑘', count: 1, points: 1 },
+  { letter: '𐑙', count: 1, points: 1 },
+  { letter: '𐑚', count: 2, points: 1 },
+  { letter: '𐑛', count: 3, points: 1 },
+  { letter: '𐑜', count: 2, points: 1 },
+  { letter: '𐑝', count: 2, points: 1 },
+  { letter: '𐑞', count: 3, points: 1 },
+  { letter: '𐑟', count: 3, points: 1 },
+  { letter: '𐑠', count: 1, points: 10 },
+  { letter: '𐑡', count: 1, points: 2 },
+  { letter: '𐑢', count: 3, points: 1 },
+  { letter: '𐑣', count: 1, points: 1 },
+  { letter: '𐑤', count: 4, points: 1 },
+  { letter: '𐑥', count: 3, points: 1 },
+  { letter: '𐑦', count: 5, points: 1 },
+  { letter: '𐑧', count: 2, points: 1 },
+  { letter: '𐑨', count: 2, points: 1 },
+  { letter: '𐑩', count: 5, points: 1 },
+  { letter: '𐑪', count: 2, points: 1 },
+  { letter: '𐑫', count: 2, points: 2 },
+  { letter: '𐑬', count: 1, points: 2 },
+  { letter: '𐑭', count: 1, points: 1 },
+  { letter: '𐑮', count: 5, points: 1 },
+  { letter: '𐑯', count: 5, points: 1 },
+  { letter: '𐑰', count: 2, points: 1 },
+  { letter: '𐑱', count: 2, points: 1 },
+  { letter: '𐑲', count: 2, points: 1 },
+  { letter: '𐑳', count: 2, points: 1 },
+  { letter: '𐑴', count: 1, points: 1 },
+  { letter: '𐑵', count: 1, points: 1 },
+  { letter: '𐑶', count: 1, points: 7 },
+  { letter: '𐑷', count: 2, points: 1 },
+  { letter: '𐑺', count: 1, points: 2 },
+  { letter: '𐑻', count: 2, points: 1 },
+  { letter: 'blank', count: 2, points: 0 }
+];
+
+let customTiles = null;
+
+function setupCustomTileEditor() {
+  const tileDistRadios = document.querySelectorAll('input[name="tile-distribution"]');
+  const editBtn = document.getElementById('edit-tiles-btn');
+
+  // Show/hide edit button based on selection
+  tileDistRadios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      editBtn.style.display = e.target.value === 'custom' ? 'block' : 'none';
+    });
+  });
+
+  // Open tile editor
+  editBtn.addEventListener('click', () => {
+    openTileEditor();
+  });
+
+  // Save tiles
+  document.getElementById('save-tiles-btn').addEventListener('click', () => {
+    saveTileDistribution();
+  });
+
+  // Reset to default
+  document.getElementById('reset-tiles-btn').addEventListener('click', () => {
+    customTiles = JSON.parse(JSON.stringify(DEFAULT_TILES));
+    populateTileEditor();
+  });
+
+  // Export as CSV
+  document.getElementById('export-csv-btn').addEventListener('click', () => {
+    exportTilesAsCSV();
+  });
+
+  // Load custom tiles from localStorage
+  const saved = localStorage.getItem('customTiles');
+  if (saved) {
+    try {
+      customTiles = JSON.parse(saved);
+    } catch (e) {
+      console.error('Failed to parse custom tiles:', e);
+    }
+  }
+}
+
+function openTileEditor() {
+  // Initialize with custom tiles or default
+  if (!customTiles) {
+    customTiles = JSON.parse(JSON.stringify(DEFAULT_TILES));
+  }
+  populateTileEditor();
+  document.getElementById('tile-editor-dialog').style.display = 'flex';
+}
+
+function populateTileEditor() {
+  const tbody = document.getElementById('tile-editor-body');
+  tbody.innerHTML = '';
+
+  customTiles.forEach((tile, index) => {
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 1.2em;">${tile.letter === 'blank' ? '(Blank)' : tile.letter}</td>
+      <td style="padding: 8px; border: 1px solid #ddd;">
+        <input type="number" min="0" max="20" value="${tile.count}" data-index="${index}" data-field="count"
+               style="width: 60px; padding: 4px; text-align: center;">
+      </td>
+      <td style="padding: 8px; border: 1px solid #ddd;">
+        <input type="number" min="0" max="20" value="${tile.points}" data-index="${index}" data-field="points"
+               style="width: 60px; padding: 4px; text-align: center;">
+      </td>
+    `;
+    tbody.appendChild(row);
+  });
+
+  // Add event listeners to inputs
+  tbody.querySelectorAll('input').forEach(input => {
+    input.addEventListener('input', updateTileValue);
+  });
+
+  updateTotalCount();
+}
+
+function updateTileValue(e) {
+  const index = parseInt(e.target.dataset.index);
+  const field = e.target.dataset.field;
+  const value = parseInt(e.target.value) || 0;
+
+  customTiles[index][field] = value;
+  updateTotalCount();
+}
+
+function updateTotalCount() {
+  const total = customTiles.reduce((sum, tile) => sum + tile.count, 0);
+  document.getElementById('total-tiles-count').textContent = total;
+}
+
+function saveTileDistribution() {
+  localStorage.setItem('customTiles', JSON.stringify(customTiles));
+  document.getElementById('tile-editor-dialog').style.display = 'none';
+  alert('Custom tile distribution saved!');
+}
+
+function exportTilesAsCSV() {
+  let csv = 'letter,count,points\n';
+  customTiles.forEach(tile => {
+    csv += `${tile.letter},${tile.count},${tile.points}\n`;
+  });
+
+  // Create download link
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'custom_tiles.csv';
+  a.click();
+  window.URL.revokeObjectURL(url);
+}
+
+function getSelectedTileDistribution() {
+  const useCustom = document.querySelector('input[name="tile-distribution"]:checked').value === 'custom';
+  return useCustom && customTiles ? customTiles : null;
+}
