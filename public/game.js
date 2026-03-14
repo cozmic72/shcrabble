@@ -7,6 +7,7 @@ let currentPlacements = [];
 let draggedTile = null;
 let draggedFromRack = false;
 let rackDragSource = null;
+let previousRackSize = 0;
 
 // Initialize socket connection
 function initSocket() {
@@ -343,6 +344,9 @@ function updateRack() {
   const myPlayer = gameState.players.find(p => p.id === playerId);
   if (!myPlayer || !myPlayer.rack) return;
 
+  const currentRackSize = myPlayer.rack.length;
+  const hasNewTiles = currentRackSize > previousRackSize;
+
   myPlayer.rack.forEach((tile, idx) => {
     // Skip tiles that have been placed on the board
     const isPlaced = currentPlacements.some(p => p.rackIndex === idx);
@@ -350,6 +354,11 @@ function updateRack() {
 
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
+
+    // Animate new tiles (tiles at the end of the rack after move submission)
+    if (hasNewTiles && idx >= previousRackSize) {
+      tileDiv.classList.add('new-tile');
+    }
 
     if (tile.isBlank) {
       tileDiv.classList.add('blank');
@@ -376,6 +385,8 @@ function updateRack() {
 
     rackDiv.appendChild(tileDiv);
   });
+
+  previousRackSize = currentRackSize;
 
   // Make rack itself a drop zone for reordering
   rackDiv.addEventListener('dragover', handleRackDragOver);
