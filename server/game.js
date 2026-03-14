@@ -359,15 +359,14 @@ class Game {
       throw new Error('Move must form at least one word');
     }
 
-    // Temporarily disable dictionary validation for debugging
     // Check dictionary if available
-    // if (this.dictionary) {
-    //   for (const word of wordsToCheck) {
-    //     if (!this.dictionary.isValidWord(word)) {
-    //       throw new Error(`Invalid word: ${word}`);
-    //     }
-    //   }
-    // }
+    if (this.dictionary) {
+      for (const word of wordsToCheck) {
+        if (!this.dictionary.isValidWord(word)) {
+          throw new Error(`Invalid word: ${word}`);
+        }
+      }
+    }
 
     return true;
   }
