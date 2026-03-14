@@ -598,7 +598,6 @@ io.on('connection', (socket) => {
         score
       });
 
-      const game = games.get(gameId);
       const otherPlayers = game.players.filter(p => p.id !== playerId);
       const totalVoters = otherPlayers.length + game.spectators.length;
 
