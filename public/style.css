@@ -230,37 +230,52 @@ body {
   background: #5568d3;
 }
 
-/* Compound letter table */
-.compound-table {
-  width: 100%;
-  border-collapse: collapse;
+/* Compound letter breakdown */
+.compound-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
   margin: 20px 0;
-}
-
-.compound-table th,
-.compound-table td {
-  padding: 12px;
-  text-align: left;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.compound-table th {
+  padding: 20px;
   background: #f5f5f5;
-  font-weight: bold;
-  color: #667eea;
+  border-radius: 8px;
 }
 
-.compound-table .compound-letter {
-  font-size: 1.8em;
-  font-weight: bold;
-  color: #764ba2;
+.breakdown-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.compound-table .split-letters {
-  font-size: 1.5em;
+.breakdown-row .tile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 45px;
+  height: 45px;
+  background: linear-gradient(135deg, #f5e5a3 0%, #f0e68c 50%, #e6d77a 100%);
+  border: 2px solid #daa520;
+  border-radius: 4px;
+  font-size: 1.4em;
+  font-weight: bold;
+  color: #333;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+}
+
+.breakdown-row .tile.compound {
+  background: linear-gradient(135deg, #ffb3b3 0%, #ff9999 50%, #ff7f7f 100%);
+  border-color: #cc5555;
+}
+
+.breakdown-row .operator {
+  font-size: 1.3em;
   font-weight: bold;
   color: #667eea;
-  letter-spacing: 2px;
+  padding: 0 4px;
 }
 
 .important-note {
