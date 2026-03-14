@@ -531,50 +531,38 @@ function updateRack() {
   const myPlayer = gameState.players.find(p => p.id === playerId);
   if (!myPlayer || !myPlayer.rack) return;
 
-  // Build rack including gaps for placed tiles
-  const fullRack = myPlayer.rack.map((tile, idx) => {
-    const isPlaced = currentPlacements.some(p => p.rackIndex === idx);
-    return { tile, originalIndex: idx, isPlaced };
-  });
+  // Build current visible rack (excluding placed tiles - they close the gap)
+  const visibleRack = myPlayer.rack
+    .map((tile, idx) => ({ tile, originalIndex: idx }))
+    .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
 
-  const currentRackSize = fullRack.filter(item => !item.isPlaced).length;
+  const currentRackSize = visibleRack.length;
   const hasNewTiles = currentRackSize > previousRackSize;
   const numNewTiles = hasNewTiles ? currentRackSize - previousRackSize : 0;
 
   // Clear and rebuild rack
   rackDiv.innerHTML = '';
 
-  let visibleIndex = 0;
-  fullRack.forEach(({ tile, originalIndex, isPlaced }) => {
-    if (isPlaced) {
-      // Create an invisible gap placeholder
-      const gapDiv = document.createElement('div');
-      gapDiv.className = 'rack-tile rack-gap';
-      gapDiv.style.opacity = '0';
-      gapDiv.style.pointerEvents = 'none';
-      rackDiv.appendChild(gapDiv);
-      return;
-    }
-
+  visibleRack.forEach(({ tile, originalIndex }, displayIndex) => {
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
 
     // Determine if this is a new tile (added at the beginning, pushing others right)
-    const isNewTile = hasNewTiles && visibleIndex < numNewTiles;
+    const isNewTile = hasNewTiles && displayIndex < numNewTiles;
 
     // Determine if this is an existing tile that needs to slide right
-    const isShiftingTile = hasNewTiles && visibleIndex >= numNewTiles;
+    const isShiftingTile = hasNewTiles && displayIndex >= numNewTiles;
 
     if (isNewTile) {
       tileDiv.classList.add('new-tile');
       // Stagger the animation for multiple new tiles
-      tileDiv.style.animationDelay = `${visibleIndex * 0.1}s`;
+      tileDiv.style.animationDelay = `${displayIndex * 0.1}s`;
     } else if (isShiftingTile) {
       tileDiv.classList.add('sliding');
       // Calculate how far to slide from (in pixels)
       const slideDistance = -60 * numNewTiles; // 50px tile + 10px gap
       tileDiv.style.setProperty('--slide-from', `${slideDistance}px`);
-      tileDiv.style.animationDelay = `${visibleIndex * 0.05}s`;
+      tileDiv.style.animationDelay = `${displayIndex * 0.05}s`;
     }
 
     if (tile.isBlank) {
@@ -613,11 +601,10 @@ function updateRack() {
     }
 
     rackDiv.appendChild(tileDiv);
-    visibleIndex++;
   });
 
   previousRackSize = currentRackSize;
-  previousRackState = fullRack.filter(item => !item.isPlaced).map(({ tile }) => tile);
+  previousRackState = visibleRack.map(({ tile }) => tile);
 
   // Make rack itself a drop zone for reordering
   rackDiv.addEventListener('dragover', handleRackDragOver);
@@ -1150,11 +1137,12 @@ function submitMove() {
 function recallTiles() {
   if (currentPlacements.length === 0) return;
 
-  // Find all placed tile elements on the board and animate them
   const board = document.getElementById('board');
-  const placedTileElements = [];
+  const rack = document.getElementById('rack');
+  const rackRect = rack.getBoundingClientRect();
 
-  currentPlacements.forEach(placement => {
+  // Animate each placed tile flying back to the rack
+  currentPlacements.forEach((placement, index) => {
     const squares = board.querySelectorAll('.square');
     squares.forEach(square => {
       const row = parseInt(square.dataset.row);
@@ -1162,26 +1150,55 @@ function recallTiles() {
       if (row === placement.row && col === placement.col) {
         const tileEl = square.querySelector('.placed-tile');
         if (tileEl) {
-          placedTileElements.push(tileEl);
+          // Get current position
+          const tileRect = tileEl.getBoundingClientRect();
+
+          // Calculate distance to rack (approximate - center of rack)
+          const deltaX = rackRect.left + rackRect.width / 2 - tileRect.left;
+          const deltaY = rackRect.top + rackRect.height / 2 - tileRect.top;
+
+          // Create a flying clone
+          const clone = tileEl.cloneNode(true);
+          clone.style.position = 'fixed';
+          clone.style.left = tileRect.left + 'px';
+          clone.style.top = tileRect.top + 'px';
+          clone.style.width = tileRect.width + 'px';
+          clone.style.height = tileRect.height + 'px';
+          clone.style.margin = '0';
+          clone.style.zIndex = '10000';
+          clone.style.transition = `all 0.4s ease-out`;
+          clone.style.transitionDelay = `${index * 0.05}s`;
+          document.body.appendChild(clone);
+
+          // Hide original
+          tileEl.style.opacity = '0';
+
+          // Trigger animation on next frame
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              clone.style.transform = `translate(${deltaX}px, ${deltaY}px) scale(0.5)`;
+              clone.style.opacity = '0';
+            });
+          });
+
+          // Remove clone after animation
+          setTimeout(() => {
+            clone.remove();
+          }, 400 + (index * 50) + 100);
         }
       }
     });
   });
 
-  // Animate tiles disappearing
-  placedTileElements.forEach((el, index) => {
-    el.classList.add('recalling');
-    el.style.animationDelay = `${index * 0.05}s`;
-  });
-
-  // Wait for animations to complete, then update state
+  // Wait for all animations to complete, then update state
+  const longestDelay = 400 + (currentPlacements.length * 50) + 100;
   setTimeout(() => {
     currentPlacements = [];
     updateBoard();
     updateGameUI();
     showMessage(i18n.t('msgTilesRecalled'), '');
     validateCurrentMove();
-  }, 300 + (placedTileElements.length * 50));
+  }, longestDelay);
 }
 
 function passTurn() {
