@@ -11,6 +11,7 @@ let previousRackSize = 0;
 let exchangeMode = false;
 let tilesToExchange = [];
 let currentVoteId = null;
+let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
 
 // Save user preferences
 function saveUserName(name) {
@@ -66,19 +67,23 @@ function initSocket() {
     playerIndex = data.playerIndex;
     gameState = data.gameState;
 
-    // Show welcome dialog on first visit
-    const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
-    if (!hideWelcome) {
-      document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
-      document.getElementById('welcome-dialog').style.display = 'flex';
-    }
-
     // Only show game screen if game is active
     if (gameState.status === 'active') {
       showGameScreen();
     }
 
     updateGameUI();
+
+    // Show welcome dialog on first visit
+    const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
+    if (!hideWelcome) {
+      document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
+      document.getElementById('welcome-dialog').style.display = 'flex';
+    } else if (pendingGameCreatedDialog) {
+      // If welcome is hidden and we have a pending game-created dialog, show it now
+      document.getElementById('game-created-dialog').style.display = 'flex';
+      pendingGameCreatedDialog = false;
+    }
 
     // If still in lobby, show waiting message
     if (gameState.status === 'waiting') {
@@ -682,9 +687,11 @@ function createGame() {
 
       const inviteLink = window.location.origin + data.inviteLink;
       document.getElementById('invite-link').value = inviteLink;
-      document.getElementById('game-created-dialog').style.display = 'flex';
 
-      // Auto-join the game
+      // Set flag to show game-created dialog after welcome dialog is dismissed
+      pendingGameCreatedDialog = true;
+
+      // Auto-join the game (which will trigger 'joined' event)
       socket.emit('join-game', {
         gameId: data.gameId,
         playerName: name
@@ -1129,6 +1136,12 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('shcrabble-hide-welcome', 'true');
     }
     document.getElementById('welcome-dialog').style.display = 'none';
+
+    // If game-created dialog is pending, show it now
+    if (pendingGameCreatedDialog) {
+      document.getElementById('game-created-dialog').style.display = 'flex';
+      pendingGameCreatedDialog = false;
+    }
   });
 
   // Initialize i18n
