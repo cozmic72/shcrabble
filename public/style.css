@@ -21,11 +21,12 @@ body {
 #app {
   max-width: 1400px;
   margin: 0 auto;
+  position: relative;
 }
 
 /* Burger Menu */
 #burger-menu {
-  position: fixed;
+  position: absolute;
   top: 20px;
   right: 20px;
   z-index: 1000;
@@ -454,6 +455,15 @@ body {
   filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.1));
 }
 
+.square .tile-points {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 0.4em;
+  font-weight: normal;
+  color: #333;
+}
+
 /* Rack */
 #rack-container {
   padding: 20px;
@@ -494,6 +504,15 @@ body {
               inset 0 -1px 0 rgba(0, 0, 0, 0.1);
   transition: transform 0.1s, box-shadow 0.1s;
   position: relative;
+}
+
+.rack-tile .tile-points {
+  position: absolute;
+  bottom: 2px;
+  right: 3px;
+  font-size: 0.5em;
+  font-weight: normal;
+  color: #333;
 }
 
 .rack-tile:active {

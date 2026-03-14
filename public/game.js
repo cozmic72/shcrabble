@@ -188,6 +188,14 @@ function updateBoard() {
         letter.className = 'tile-letter';
         letter.textContent = cell.letter;
         square.appendChild(letter);
+
+        // Add points if not blank
+        if (!cell.isBlank && cell.points) {
+          const points = document.createElement('span');
+          points.className = 'tile-points';
+          points.textContent = cell.points;
+          square.appendChild(points);
+        }
       } else {
         square.classList.remove('occupied');
       }
@@ -200,6 +208,14 @@ function updateBoard() {
         letter.className = 'tile-letter';
         letter.textContent = placement.letter;
         square.appendChild(letter);
+
+        // Add points if not blank
+        if (!placement.isBlank && placement.points) {
+          const points = document.createElement('span');
+          points.className = 'tile-points';
+          points.textContent = placement.points;
+          square.appendChild(points);
+        }
       } else {
         square.classList.remove('placement');
       }
@@ -217,12 +233,20 @@ function updateRack() {
   myPlayer.rack.forEach((tile, idx) => {
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
+
     if (tile.isBlank) {
       tileDiv.classList.add('blank');
       tileDiv.textContent = '?';
     } else {
       tileDiv.textContent = tile.letter;
+
+      // Add points display
+      const pointsSpan = document.createElement('span');
+      pointsSpan.className = 'tile-points';
+      pointsSpan.textContent = tile.points;
+      tileDiv.appendChild(pointsSpan);
     }
+
     tileDiv.dataset.index = idx;
     tileDiv.dataset.letter = tile.letter;
     tileDiv.dataset.points = tile.points;

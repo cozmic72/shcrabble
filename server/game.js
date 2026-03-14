@@ -139,6 +139,7 @@ class Game {
     placements.forEach(p => {
       this.board[p.row][p.col].letter = p.letter;
       this.board[p.row][p.col].isBlank = p.isBlank || false;
+      this.board[p.row][p.col].points = p.points || 0;
     });
 
     // Remove used tiles from rack (to be implemented fully)
