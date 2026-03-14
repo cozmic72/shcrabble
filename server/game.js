@@ -101,7 +101,7 @@ class Game {
     return null;
   }
 
-  addPlayer(playerId, playerName) {
+  addPlayer(playerId, playerName, userId = null) {
     if (this.locked) {
       throw new Error('Game is locked - first turn has been taken');
     }
@@ -117,6 +117,7 @@ class Game {
     const player = {
       id: playerId,
       name: playerName,
+      userId: userId, // Store the persistent user ID
       score: 0,
       rack: this.drawTiles(this.rackSize),
       index: this.players.length,

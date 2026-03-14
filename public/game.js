@@ -37,6 +37,17 @@ function getUserName() {
   return localStorage.getItem('shcrabble-userName') || '';
 }
 
+// Get or create a unique user ID
+function getUserId() {
+  let userId = localStorage.getItem('shcrabble-userId');
+  if (!userId) {
+    // Generate a new UUID
+    userId = crypto.randomUUID();
+    localStorage.setItem('shcrabble-userId', userId);
+  }
+  return userId;
+}
+
 // Debug function: Show owner info and help become owner
 window.becomeOwner = function() {
   if (!gameState) {
@@ -263,6 +274,11 @@ function initSocket() {
     hideGameControls();
   });
 
+  socket.on('game-deleted', (data) => {
+    alert(data.message || 'This game has been deleted');
+    window.location.href = '/shcrabble/';
+  });
+
   socket.on('vote-pending', (data) => {
     console.log('[VOTE-PENDING]', data);
     currentVoteId = data.voteId;
@@ -343,9 +359,11 @@ function updateGameUI() {
   const submitBtn = document.getElementById('submit-move-btn');
   submitBtn.disabled = currentPlacements.length === 0 || gameState.currentPlayerIndex !== playerIndex;
 
-  // Show/hide end game button for owner
+  // Show/hide end game button for owner or admin
   const endGameBtn = document.getElementById('end-game-btn');
-  if (gameState.ownerId === playerId && gameState.status !== 'completed') {
+  const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
+  const isOwner = gameState.ownerId === playerId;
+  if ((isOwner || isAdmin) && gameState.status !== 'completed') {
     endGameBtn.style.display = 'inline-block';
   } else {
     endGameBtn.style.display = 'none';
@@ -376,8 +394,10 @@ function updatePlayersList() {
     const tilesLabel = i18n.t('tiles');
     const disconnectedLabel = player.connected ? '' : ' (disconnected)';
     const isOwner = player.id === gameState.ownerId ? ' 👑' : '';
-    const canRemove = gameState.ownerId === playerId && player.id !== playerId;
-    console.log(`Player ${player.name}: ownerId=${gameState.ownerId}, myId=${playerId}, canRemove=${canRemove}`);
+    const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
+    const isGameOwner = gameState.ownerId === playerId;
+    const canRemove = (isGameOwner || isAdmin) && player.id !== playerId;
+    console.log(`Player ${player.name}: ownerId=${gameState.ownerId}, myId=${playerId}, isAdmin=${isAdmin}, canRemove=${canRemove}`);
     const removeBtn = canRemove
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
@@ -412,7 +432,8 @@ function updatePlayersList() {
     btn.addEventListener('click', (e) => {
       const targetPlayerId = e.target.dataset.playerId;
       if (confirm(i18n.t('confirmRemovePlayer'))) {
-        socket.emit('remove-player', { targetPlayerId });
+        const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
+        socket.emit('remove-player', { targetPlayerId, isAdmin });
       }
     });
   });
@@ -798,7 +819,8 @@ function createGame() {
       // Auto-join the game (which will trigger 'joined' event)
       socket.emit('join-game', {
         gameId: data.gameId,
-        playerName: name
+        playerName: name,
+        userId: getUserId()
       });
     })
     .catch(err => {
@@ -827,7 +849,8 @@ function joinGame() {
 
   socket.emit('join-game', {
     gameId: gameId,
-    playerName: name
+    playerName: name,
+    userId: getUserId()
   });
 }
 
@@ -1271,14 +1294,23 @@ function toggleTileForExchange(index) {
 
 function leaveGame() {
   if (confirm(i18n.t('confirmLeaveGame'))) {
-    // Disconnect and reload to lobby
+    // Remove yourself from the game
+    const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
+    socket.emit('remove-player', { targetPlayerId: playerId, isAdmin });
+    // Navigate to main menu
     window.location.href = '/shcrabble/';
   }
 }
 
+function goToMainMenu() {
+  // Just navigate without leaving the game
+  window.location.href = '/shcrabble/';
+}
+
 function endGame() {
   if (confirm(i18n.t('confirmEndGame'))) {
-    socket.emit('end-game');
+    const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
+    socket.emit('end-game', { isAdmin });
   }
 }
 
@@ -1296,11 +1328,15 @@ function hideGameControls() {
   }
 }
 
-async function showMyGamesDialog() {
+async function showMyGamesDialog(showAllGames = false) {
+  const userId = getUserId();
   const playerName = getUserName();
-  if (!playerName) {
-    alert(i18n.t('enterYourName'));
-    return;
+
+  // Store admin mode in sessionStorage if viewing all games
+  if (showAllGames) {
+    sessionStorage.setItem('shcrabble-adminMode', 'true');
+  } else {
+    sessionStorage.removeItem('shcrabble-adminMode');
   }
 
   const gamesList = document.getElementById('my-games-list');
@@ -1308,7 +1344,15 @@ async function showMyGamesDialog() {
   document.getElementById('my-games-dialog').style.display = 'flex';
 
   try {
-    const response = await fetch(`/shcrabble/api/my-games/${encodeURIComponent(playerName)}`);
+    // Admin view: show all games if requested, otherwise show user's games
+    let endpoint;
+    if (showAllGames) {
+      endpoint = `/shcrabble/api/all-games`;
+    } else {
+      // Include playerName for backwards compatibility with old games
+      endpoint = `/shcrabble/api/my-games/${encodeURIComponent(userId)}?playerName=${encodeURIComponent(playerName)}`;
+    }
+    const response = await fetch(endpoint);
     const data = await response.json();
 
     if (data.games.length === 0) {
@@ -1317,39 +1361,119 @@ async function showMyGamesDialog() {
     }
 
     gamesList.innerHTML = '';
+
+    // Add delete button and controls if in admin mode
+    if (showAllGames) {
+      const controlsDiv = document.createElement('div');
+      controlsDiv.style.padding = '10px';
+      controlsDiv.style.borderBottom = '2px solid #ccc';
+      controlsDiv.style.marginBottom = '10px';
+      controlsDiv.innerHTML = `
+        <button id="delete-selected-games-btn" class="primary-btn" style="background: #f44336;">Delete Selected</button>
+        <span id="selected-count" style="margin-left: 10px; color: #666;">0 selected</span>
+      `;
+      gamesList.appendChild(controlsDiv);
+    }
+
     data.games.forEach(game => {
       const gameDiv = document.createElement('div');
       gameDiv.className = 'game-item';
       gameDiv.style.padding = '15px';
       gameDiv.style.borderBottom = '1px solid #ddd';
-      gameDiv.style.cursor = 'pointer';
+      gameDiv.style.display = 'flex';
+      gameDiv.style.alignItems = 'center';
+      gameDiv.style.gap = '10px';
 
       const statusColor = game.status === 'active' ? '#4caf50' : '#ff9800';
       const isYourTurn = game.currentTurn === playerName;
       const turnIndicator = isYourTurn ? ' 🟢 Your turn!' : '';
       const activeIndicator = game.isActive ? '' : ' 💤 (No one connected)';
 
+      // Add checkbox only in admin mode
+      const checkboxHtml = showAllGames
+        ? `<input type="checkbox" class="game-checkbox" data-game-id="${game.id}" style="width: 20px; height: 20px; cursor: pointer;">`
+        : '';
+
       gameDiv.innerHTML = `
-        <div style="font-weight: bold; margin-bottom: 5px;">
-          <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...${activeIndicator}
-        </div>
-        <div style="font-size: 0.9em; color: #666;">
-          Players: ${game.players.join(', ')}
-        </div>
-        <div style="font-size: 0.9em; color: #666;">
-          Tiles remaining: ${game.tilesRemaining}${turnIndicator}
+        ${checkboxHtml}
+        <div style="flex: 1; cursor: pointer;" class="game-info">
+          <div style="font-weight: bold; margin-bottom: 5px;">
+            <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...${activeIndicator}
+          </div>
+          <div style="font-size: 0.9em; color: #666;">
+            Players: ${game.players.join(', ')}
+          </div>
+          <div style="font-size: 0.9em; color: #666;">
+            Tiles remaining: ${game.tilesRemaining}${turnIndicator}
+          </div>
         </div>
       `;
 
-      gameDiv.addEventListener('click', () => {
+      // Only navigate when clicking the info area, not the checkbox
+      const infoDiv = gameDiv.querySelector('.game-info');
+      infoDiv.addEventListener('click', () => {
         window.location.href = `/shcrabble/?game=${game.id}`;
       });
 
       gamesList.appendChild(gameDiv);
     });
+
+    // Add event listeners for admin controls
+    if (showAllGames) {
+      // Update selected count when checkboxes change
+      document.querySelectorAll('.game-checkbox').forEach(cb => {
+        cb.addEventListener('change', updateSelectedCount);
+      });
+
+      // Delete selected games
+      document.getElementById('delete-selected-games-btn').addEventListener('click', deleteSelectedGames);
+    }
   } catch (err) {
     console.error('Error loading games:', err);
     gamesList.innerHTML = '<p>Error loading games. Please try again.</p>';
+  }
+}
+
+function updateSelectedCount() {
+  const checkboxes = document.querySelectorAll('.game-checkbox:checked');
+  const countSpan = document.getElementById('selected-count');
+  if (countSpan) {
+    countSpan.textContent = `${checkboxes.length} selected`;
+  }
+}
+
+async function deleteSelectedGames() {
+  const checkboxes = document.querySelectorAll('.game-checkbox:checked');
+  const gameIds = Array.from(checkboxes).map(cb => cb.dataset.gameId);
+
+  if (gameIds.length === 0) {
+    alert('No games selected');
+    return;
+  }
+
+  if (!confirm(`Delete ${gameIds.length} game(s)? This cannot be undone.`)) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/shcrabble/api/delete-games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameIds })
+    });
+
+    const result = await response.json();
+
+    if (response.ok) {
+      alert(`Successfully deleted ${result.deleted} game(s)`);
+      // Refresh the games list
+      await showMyGamesDialog(true); // true = show all games (admin mode)
+    } else {
+      alert(`Error: ${result.error}`);
+    }
+  } catch (err) {
+    console.error('Error deleting games:', err);
+    alert('Failed to delete games. Please try again.');
   }
 }
 
@@ -1377,10 +1501,21 @@ function showGameEndedDialog(finalScores) {
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
 
-  // Check if joining via link - auto-open join dialog
+  // Check if joining via link
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('game')) {
-    showJoinGameDialog();
+    const gameId = urlParams.get('game');
+    const savedName = getUserName();
+
+    // If we have a saved name, join directly. Otherwise show dialog.
+    if (savedName) {
+      // Auto-join the game
+      const userId = getUserId();
+      socket.emit('join-game', { gameId, playerName: savedName, userId });
+    } else {
+      // Show join dialog to get name
+      showJoinGameDialog();
+    }
   }
 
   // Event listeners for lobby buttons
@@ -1396,6 +1531,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('exchange-tiles-btn').addEventListener('click', exchangeTilesClick);
   document.getElementById('cancel-exchange-btn').addEventListener('click', cancelExchange);
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
+  document.getElementById('main-menu-game-btn').addEventListener('click', goToMainMenu);
   document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
 
@@ -1538,18 +1674,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Main Menu button (only in game screen)
-  const mainMenuBtn = document.getElementById('main-menu-btn');
-  if (mainMenuBtn) {
-    mainMenuBtn.addEventListener('click', () => {
-      window.location.href = '/shcrabble/';
-    });
-  }
 
   // My Games menu buttons
   document.querySelectorAll('#my-games-menu-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      await showMyGamesDialog();
+    btn.addEventListener('click', async (e) => {
+      // Admin view: Cmd/Ctrl+click shows all games
+      const showAllGames = e.metaKey || e.ctrlKey;
+      await showMyGamesDialog(showAllGames);
       document.querySelectorAll('#burger-dropdown').forEach(d => {
         d.style.display = 'none';
       });

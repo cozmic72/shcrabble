@@ -43,16 +43,78 @@ app.get('/shcrabble/api/health', (req, res) => {
   res.json({ status: 'ok', games: games.size });
 });
 
-// Get user's games
-app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
+// Get all games (admin view)
+app.get('/shcrabble/api/all-games', async (req, res) => {
   try {
-    const playerName = decodeURIComponent(req.params.playerName);
+    const allGames = [];
+    const seenGameIds = new Set();
+
+    // First, get all active games from memory
+    for (const [gameId, game] of games.entries()) {
+      seenGameIds.add(gameId);
+      allGames.push({
+        id: gameId,
+        status: game.status,
+        players: game.players.map(p => p.name),
+        currentTurn: game.players[game.currentPlayerIndex]?.name,
+        tilesRemaining: game.tileBag ? game.tileBag.length : 0,
+        isActive: true
+      });
+    }
+
+    // Then, get all games from database
+    const dbRows = await db.query('SELECT id, game_state, status FROM sessions WHERE status != ?', ['completed']);
+    for (const row of dbRows) {
+      if (seenGameIds.has(row.id)) continue; // Already got this one from memory
+
+      try {
+        const gameState = typeof row.game_state === 'string'
+          ? JSON.parse(row.game_state)
+          : row.game_state;
+
+        allGames.push({
+          id: row.id,
+          status: row.status,
+          players: gameState.players ? gameState.players.map(p => p.name) : [],
+          currentTurn: gameState.players ? gameState.players[gameState.currentPlayerIndex]?.name : null,
+          tilesRemaining: gameState.tileBag ? gameState.tileBag.length : 0,
+          isActive: false
+        });
+      } catch (e) {
+        console.error(`Error parsing game state for ${row.id}:`, e);
+      }
+    }
+
+    res.json({ games: allGames });
+  } catch (err) {
+    console.error('Error fetching all games:', err);
+    res.status(500).json({ error: 'Failed to fetch games' });
+  }
+});
+
+// Get user's games
+app.get('/shcrabble/api/my-games/:userId', async (req, res) => {
+  try {
+    const userId = decodeURIComponent(req.params.userId);
+    const playerName = req.query.playerName; // For backwards compatibility with old games
     const myGames = [];
     const seenGameIds = new Set();
 
     // First, get all active games from memory
     for (const [gameId, game] of games.entries()) {
-      const player = game.players.find(p => p.name === playerName);
+      let player = null;
+
+      // Check if any player has userId (new games)
+      const hasUserId = game.players.some(p => p.userId);
+
+      if (hasUserId) {
+        // New game with userId - match by userId
+        player = game.players.find(p => p.userId === userId);
+      } else if (playerName) {
+        // Old game without userId - fall back to name matching
+        player = game.players.find(p => p.name === playerName);
+      }
+
       if (player) {
         seenGameIds.add(gameId);
         myGames.push({
@@ -78,7 +140,18 @@ app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
           ? JSON.parse(row.game_state)
           : row.game_state;
 
-        const hasPlayer = gameState.players && gameState.players.some(p => p.name === playerName);
+        let hasPlayer = false;
+
+        // Check if any player has userId (new games)
+        const hasUserId = gameState.players && gameState.players.some(p => p.userId);
+
+        if (hasUserId) {
+          // New game with userId - match by userId
+          hasPlayer = gameState.players.some(p => p.userId === userId);
+        } else if (playerName && gameState.players) {
+          // Old game without userId - fall back to name matching
+          hasPlayer = gameState.players.some(p => p.name === playerName);
+        }
 
         if (hasPlayer) {
           myGames.push({
@@ -99,6 +172,42 @@ app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
   } catch (err) {
     console.error('Error fetching my games:', err);
     res.status(500).json({ error: 'Failed to fetch games' });
+  }
+});
+
+// Delete multiple games (admin)
+app.post('/shcrabble/api/delete-games', async (req, res) => {
+  try {
+    const { gameIds } = req.body;
+
+    if (!gameIds || !Array.isArray(gameIds) || gameIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid game IDs' });
+    }
+
+    let deletedCount = 0;
+
+    for (const gameId of gameIds) {
+      // Remove from memory if exists
+      const game = games.get(gameId);
+      if (game) {
+        // Notify all connected players
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          s.emit('game-deleted', { message: 'This game has been deleted by an administrator' });
+          s.leave(gameId);
+        }
+        games.delete(gameId);
+      }
+
+      // Delete from database
+      await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
+      deletedCount++;
+    }
+
+    res.json({ deleted: deletedCount });
+  } catch (err) {
+    console.error('Error deleting games:', err);
+    res.status(500).json({ error: 'Failed to delete games' });
   }
 });
 
@@ -134,7 +243,7 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Join game
-  socket.on('join-game', async ({ gameId, playerName }) => {
+  socket.on('join-game', async ({ gameId, playerName, userId }) => {
     try {
       let game = games.get(gameId);
 
@@ -251,7 +360,7 @@ io.on('connection', (socket) => {
 
       // New player joining
       const playerId = uuidv4();
-      const player = game.addPlayer(playerId, playerName);
+      const player = game.addPlayer(playerId, playerName, userId);
 
       // Save player to database
       await db.query(
@@ -639,7 +748,7 @@ io.on('connection', (socket) => {
   });
 
   // Owner: Remove player
-  socket.on('remove-player', async ({ targetPlayerId }) => {
+  socket.on('remove-player', async ({ targetPlayerId, isAdmin = false }) => {
     try {
       const { gameId, playerId } = socket.data;
       const game = games.get(gameId);
@@ -649,8 +758,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Check if requester is the owner
-      if (game.ownerId !== playerId) {
+      // Check if requester is the owner or admin
+      if (!isAdmin && game.ownerId !== playerId) {
         socket.emit('error', { message: 'Only the game owner can remove players' });
         return;
       }
@@ -697,7 +806,7 @@ io.on('connection', (socket) => {
   });
 
   // Owner: End game
-  socket.on('end-game', async () => {
+  socket.on('end-game', async ({ isAdmin = false } = {}) => {
     try {
       const { gameId, playerId } = socket.data;
       const game = games.get(gameId);
@@ -707,8 +816,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Check if requester is the owner
-      if (game.ownerId !== playerId) {
+      // Check if requester is the owner or admin
+      if (!isAdmin && game.ownerId !== playerId) {
         socket.emit('error', { message: 'Only the game owner can end the game' });
         return;
       }
