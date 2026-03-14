@@ -654,31 +654,27 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Set game to completed
-      game.status = 'completed';
-
-      // Update database
-      await db.query(
-        'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
-        [game.serialize(), game.status, gameId]
-      );
-
       // Calculate final scores
       const finalScores = game.players.map(p => ({
         name: p.name,
         score: p.score
       })).sort((a, b) => b.score - a.score);
 
-      // Notify all participants
+      // Notify all participants before deleting
       const sockets = await io.in(gameId).fetchSockets();
       for (const s of sockets) {
         s.emit('game-ended', {
-          finalScores,
-          gameState: game.getState(s.data.playerId || null)
+          finalScores
         });
       }
 
-      console.log(`Game ${gameId} ended by owner`);
+      // Delete game from database
+      await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
+
+      // Remove from memory
+      games.delete(gameId);
+
+      console.log(`Game ${gameId} ended by owner and deleted`);
 
     } catch (err) {
       console.error('Error ending game:', err);

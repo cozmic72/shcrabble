@@ -258,8 +258,9 @@ function initSocket() {
   });
 
   socket.on('game-ended', (data) => {
-    gameState = data.gameState;
     showGameEndedDialog(data.finalScores);
+    // Hide game controls since game is over
+    hideGameControls();
   });
 
   socket.on('vote-pending', (data) => {
@@ -1278,6 +1279,20 @@ function leaveGame() {
 function endGame() {
   if (confirm(i18n.t('confirmEndGame'))) {
     socket.emit('end-game');
+  }
+}
+
+function hideGameControls() {
+  // Hide rack and controls
+  const rackContainer = document.getElementById('rack-container');
+  if (rackContainer) {
+    rackContainer.style.display = 'none';
+  }
+
+  // Hide end game button
+  const endGameBtn = document.getElementById('end-game-btn');
+  if (endGameBtn) {
+    endGameBtn.style.display = 'none';
   }
 }
 
