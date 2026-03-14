@@ -87,12 +87,100 @@ io.on('connection', (socket) => {
         games.set(gameId, game);
       }
 
-      // Check for duplicate names
-      if (game.players.some(p => p.name.toLowerCase() === playerName.toLowerCase())) {
-        socket.emit('error', { message: 'A player with that name is already in the game' });
+      // Check if this is a reconnection
+      const existingPlayer = game.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+
+      if (existingPlayer) {
+        // Reconnect existing player
+        const playerId = uuidv4();
+        const player = game.reconnectPlayer(playerId, playerName);
+
+        if (!player) {
+          socket.emit('error', { message: 'Failed to reconnect' });
+          return;
+        }
+
+        // Update player ID in database
+        await db.query(
+          'UPDATE players SET id = ? WHERE session_id = ? AND player_name = ?',
+          [playerId, gameId, playerName]
+        );
+
+        // Update game state
+        await db.query(
+          'UPDATE sessions SET game_state = ? WHERE id = ?',
+          [game.serialize(), gameId]
+        );
+
+        // Join socket room
+        socket.join(gameId);
+        socket.data.gameId = gameId;
+        socket.data.playerId = playerId;
+        socket.data.isSpectator = false;
+
+        // Send rejoin confirmation
+        socket.emit('joined', {
+          playerId,
+          playerIndex: player.index,
+          gameState: game.getState(playerId),
+          reconnected: true
+        });
+
+        // Notify others of reconnection
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          if (s.id !== socket.id) {
+            s.emit('player-reconnected', {
+              playerName: player.name,
+              gameState: game.getState(s.data.playerId)
+            });
+          }
+        }
+
+        console.log(`Player ${playerName} reconnected to game ${gameId}`);
         return;
       }
 
+      // Check if game is locked - if so, join as spectator
+      if (game.locked) {
+        const spectatorId = uuidv4();
+        const spectator = game.addSpectator(spectatorId, playerName);
+
+        // Save game state
+        await db.query(
+          'UPDATE sessions SET game_state = ? WHERE id = ?',
+          [game.serialize(), gameId]
+        );
+
+        // Join socket room
+        socket.join(gameId);
+        socket.data.gameId = gameId;
+        socket.data.playerId = spectatorId;
+        socket.data.isSpectator = true;
+
+        // Send spectator confirmation
+        socket.emit('joined', {
+          spectatorId,
+          gameState: game.getState(null),
+          isSpectator: true
+        });
+
+        // Notify others
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          if (s.id !== socket.id) {
+            s.emit('spectator-joined', {
+              spectatorName: spectator.name,
+              spectators: game.spectators
+            });
+          }
+        }
+
+        console.log(`Spectator ${playerName} joined game ${gameId}`);
+        return;
+      }
+
+      // New player joining
       const playerId = uuidv4();
       const player = game.addPlayer(playerId, playerName);
 
@@ -112,6 +200,7 @@ io.on('connection', (socket) => {
       socket.join(gameId);
       socket.data.gameId = gameId;
       socket.data.playerId = playerId;
+      socket.data.isSpectator = false;
 
       // Send game state to all players
       socket.emit('joined', {
@@ -124,7 +213,7 @@ io.on('connection', (socket) => {
       const sockets = await io.in(gameId).fetchSockets();
       for (const s of sockets) {
         s.emit('game-update', {
-          gameState: game.getState(s.data.playerId)
+          gameState: game.getState(s.data.playerId || null)
         });
       }
 
@@ -173,11 +262,11 @@ io.on('connection', (socket) => {
         [player.score, playerId]
       );
 
-      // Notify all players with personalized game state
+      // Notify all players and spectators with personalized game state
       const sockets = await io.in(gameId).fetchSockets();
       for (const s of sockets) {
         s.emit('game-update', {
-          gameState: game.getState(s.data.playerId),
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
           lastMove: {
             playerId,
             playerName: player.name,
@@ -240,48 +329,83 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', async () => {
-    const { gameId, playerId } = socket.data;
-    console.log('Client disconnected:', socket.id);
-
-    if (!gameId || !playerId) return;
-
+  // Owner: Remove player
+  socket.on('remove-player', async ({ targetPlayerId }) => {
     try {
+      const { gameId, playerId } = socket.data;
       const game = games.get(gameId);
-      if (!game) return;
 
-      // Find and remove the player
-      const playerIndex = game.players.findIndex(p => p.id === playerId);
-      if (playerIndex === -1) return;
-
-      const player = game.players[playerIndex];
-      console.log(`Player ${player.name} left game ${gameId}`);
-
-      // Remove player from game
-      game.players.splice(playerIndex, 1);
-
-      // Update player indices
-      game.players.forEach((p, idx) => {
-        p.index = idx;
-      });
-
-      // Adjust current player index if needed
-      if (game.currentPlayerIndex >= game.players.length) {
-        game.currentPlayerIndex = 0;
-      }
-
-      // If no players left, clean up the game
-      if (game.players.length === 0) {
-        games.delete(gameId);
-        await db.query('UPDATE sessions SET status = ? WHERE id = ?', ['completed', gameId]);
-        console.log(`Game ${gameId} ended - no players remaining`);
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
         return;
       }
 
-      // If less than 2 players, set game back to waiting
-      if (game.players.length < 2) {
-        game.status = 'waiting';
+      // Check if requester is the owner
+      if (game.ownerId !== playerId) {
+        socket.emit('error', { message: 'Only the game owner can remove players' });
+        return;
       }
+
+      // Remove the player
+      const removedPlayer = game.removePlayer(targetPlayerId);
+
+      if (!removedPlayer) {
+        socket.emit('error', { message: 'Player not found' });
+        return;
+      }
+
+      // Delete from database
+      await db.query('DELETE FROM players WHERE id = ?', [targetPlayerId]);
+
+      // Update game state
+      await db.query(
+        'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
+        [game.serialize(), game.status, gameId]
+      );
+
+      // Notify all participants
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        if (s.data.playerId === targetPlayerId) {
+          s.emit('removed-from-game', {
+            message: 'You have been removed from the game by the owner'
+          });
+          s.leave(gameId);
+        } else {
+          s.emit('player-removed', {
+            playerName: removedPlayer.name,
+            gameState: game.getState(s.data.playerId || null)
+          });
+        }
+      }
+
+      console.log(`Player ${removedPlayer.name} removed from game ${gameId} by owner`);
+
+    } catch (err) {
+      console.error('Error removing player:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  // Owner: End game
+  socket.on('end-game', async () => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      // Check if requester is the owner
+      if (game.ownerId !== playerId) {
+        socket.emit('error', { message: 'Only the game owner can end the game' });
+        return;
+      }
+
+      // Set game to completed
+      game.status = 'completed';
 
       // Update database
       await db.query(
@@ -289,19 +413,95 @@ io.on('connection', (socket) => {
         [game.serialize(), game.status, gameId]
       );
 
-      await db.query('DELETE FROM players WHERE id = ?', [playerId]);
+      // Calculate final scores
+      const finalScores = game.players.map(p => ({
+        name: p.name,
+        score: p.score
+      })).sort((a, b) => b.score - a.score);
 
-      // Notify remaining players
+      // Notify all participants
       const sockets = await io.in(gameId).fetchSockets();
       for (const s of sockets) {
-        s.emit('game-update', {
-          gameState: game.getState(s.data.playerId)
-        });
-        s.emit('player-left', {
-          playerName: player.name,
-          playersRemaining: game.players.length
+        s.emit('game-ended', {
+          finalScores,
+          gameState: game.getState(s.data.playerId || null)
         });
       }
+
+      console.log(`Game ${gameId} ended by owner`);
+
+    } catch (err) {
+      console.error('Error ending game:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  socket.on('disconnect', async () => {
+    const { gameId, playerId, isSpectator } = socket.data;
+    console.log('Client disconnected:', socket.id);
+
+    if (!gameId) return;
+
+    try {
+      let game = games.get(gameId);
+
+      // Try to load from DB if not in memory
+      if (!game) {
+        const rows = await db.query('SELECT game_state FROM sessions WHERE id = ?', [gameId]);
+        if (rows && rows.length > 0 && rows[0].game_state) {
+          game = Game.deserialize(gameId, rows[0].game_state);
+          games.set(gameId, game);
+        }
+      }
+
+      if (!game) return;
+
+      if (isSpectator) {
+        // Remove spectator
+        const spectator = game.removeSpectator(playerId);
+        if (spectator) {
+          console.log(`Spectator ${spectator.name} left game ${gameId}`);
+
+          // Notify remaining participants
+          const sockets = await io.in(gameId).fetchSockets();
+          for (const s of sockets) {
+            s.emit('spectator-left', {
+              spectatorName: spectator.name,
+              spectators: game.spectators
+            });
+          }
+        }
+      } else {
+        // Mark player as disconnected
+        const disconnected = game.disconnectPlayer(playerId);
+        if (disconnected) {
+          const player = game.players.find(p => p.id === playerId);
+          console.log(`Player ${player.name} disconnected from game ${gameId}`);
+
+          // Notify remaining participants
+          const sockets = await io.in(gameId).fetchSockets();
+          for (const s of sockets) {
+            s.emit('player-disconnected', {
+              playerName: player.name,
+              gameState: game.getState(s.data.playerId)
+            });
+          }
+        }
+      }
+
+      // Check if all players are disconnected
+      const allDisconnected = game.players.every(p => !p.connected);
+      if (allDisconnected && game.players.length > 0) {
+        // All players disconnected - remove from memory but keep in DB
+        games.delete(gameId);
+        console.log(`Game ${gameId} removed from memory - all players disconnected`);
+      }
+
+      // Save game state to database
+      await db.query(
+        'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
+        [game.serialize(), game.status, gameId]
+      );
 
     } catch (err) {
       console.error('Error handling disconnect:', err);

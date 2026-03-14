@@ -23,10 +23,14 @@ class Game {
     this.gameId = gameId;
     this.board = this.createEmptyBoard();
     this.players = [];
+    this.spectators = [];
     this.currentPlayerIndex = 0;
     this.tileBag = [];
     this.tiles = null;
     this.status = 'waiting'; // waiting, active, completed
+    this.locked = false; // true after first turn is taken
+    this.turnsTaken = 0;
+    this.ownerId = null; // Player ID of game creator
   }
 
   // Load tiles from CSV
@@ -89,6 +93,10 @@ class Game {
   }
 
   addPlayer(playerId, playerName) {
+    if (this.locked) {
+      throw new Error('Game is locked - first turn has been taken');
+    }
+
     if (this.players.length >= 4) {
       throw new Error('Game is full');
     }
@@ -102,13 +110,99 @@ class Game {
       name: playerName,
       score: 0,
       rack: this.drawTiles(7),
-      index: this.players.length
+      index: this.players.length,
+      connected: true
     };
 
     this.players.push(player);
 
+    // First player is the owner
+    if (this.players.length === 1) {
+      this.ownerId = playerId;
+    }
+
     if (this.players.length === 2 && this.status === 'waiting') {
       this.status = 'active';
+    }
+
+    return player;
+  }
+
+  // Reconnect existing player
+  reconnectPlayer(playerId, playerName) {
+    const player = this.players.find(p => p.name === playerName);
+    if (!player) {
+      return null;
+    }
+
+    // Update player ID and mark as connected
+    player.id = playerId;
+    player.connected = true;
+
+    return player;
+  }
+
+  // Add spectator
+  addSpectator(spectatorId, spectatorName) {
+    const spectator = {
+      id: spectatorId,
+      name: spectatorName
+    };
+
+    this.spectators.push(spectator);
+    return spectator;
+  }
+
+  // Remove spectator
+  removeSpectator(spectatorId) {
+    const index = this.spectators.findIndex(s => s.id === spectatorId);
+    if (index !== -1) {
+      const spectator = this.spectators[index];
+      this.spectators.splice(index, 1);
+      return spectator;
+    }
+    return null;
+  }
+
+  // Mark player as disconnected
+  disconnectPlayer(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (player) {
+      player.connected = false;
+      return true;
+    }
+    return false;
+  }
+
+  // Remove player completely (by owner)
+  removePlayer(playerId) {
+    const index = this.players.findIndex(p => p.id === playerId);
+    if (index === -1) return null;
+
+    const player = this.players[index];
+
+    // Return tiles to bag
+    if (player.rack) {
+      this.tileBag.push(...player.rack);
+      this.shuffleTileBag();
+    }
+
+    this.players.splice(index, 1);
+
+    // Update player indices
+    this.players.forEach((p, idx) => {
+      p.index = idx;
+    });
+
+    // Adjust current player index if needed
+    if (this.currentPlayerIndex >= this.players.length && this.players.length > 0) {
+      this.currentPlayerIndex = 0;
+    }
+
+    // If less than 2 players, set back to waiting
+    if (this.players.length < 2) {
+      this.status = 'waiting';
+      this.locked = false;
     }
 
     return player;
@@ -156,6 +250,12 @@ class Game {
     // Refill rack
     const newTiles = this.drawTiles(placements.length);
     player.rack.push(...newTiles);
+
+    // Lock game after first turn
+    this.turnsTaken++;
+    if (this.turnsTaken === 1) {
+      this.locked = true;
+    }
 
     return true;
   }
@@ -234,11 +334,18 @@ class Game {
         name: p.name,
         score: p.score,
         rackCount: p.rack.length,
+        connected: p.connected,
         // Only send rack to the player themselves
         rack: forPlayerId === p.id ? p.rack : undefined
       })),
+      spectators: this.spectators.map(s => ({
+        id: s.id,
+        name: s.name
+      })),
       currentPlayerIndex: this.currentPlayerIndex,
       status: this.status,
+      locked: this.locked,
+      ownerId: this.ownerId,
       tilesRemaining: this.tileBag.length
     };
   }
@@ -248,9 +355,13 @@ class Game {
     return JSON.stringify({
       board: this.board,
       players: this.players,
+      spectators: this.spectators,
       currentPlayerIndex: this.currentPlayerIndex,
       tileBag: this.tileBag,
-      status: this.status
+      status: this.status,
+      locked: this.locked,
+      turnsTaken: this.turnsTaken,
+      ownerId: this.ownerId
     });
   }
 
@@ -260,10 +371,14 @@ class Game {
     // MySQL returns JSON columns as objects, not strings
     const state = typeof data === 'string' ? JSON.parse(data) : data;
     game.board = state.board;
-    game.players = state.players;
-    game.currentPlayerIndex = state.currentPlayerIndex;
-    game.tileBag = state.tileBag;
-    game.status = state.status;
+    game.players = state.players || [];
+    game.spectators = state.spectators || [];
+    game.currentPlayerIndex = state.currentPlayerIndex || 0;
+    game.tileBag = state.tileBag || [];
+    game.status = state.status || 'waiting';
+    game.locked = state.locked || false;
+    game.turnsTaken = state.turnsTaken || 0;
+    game.ownerId = state.ownerId || null;
     game.loadTiles(); // Load tile info
     return game;
   }
