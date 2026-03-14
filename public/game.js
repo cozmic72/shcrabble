@@ -20,6 +20,33 @@ function getUserName() {
   return localStorage.getItem('shcrabble-userName') || '';
 }
 
+// Debug function: Show owner info and help become owner
+window.becomeOwner = function() {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const owner = gameState.players.find(p => p.id === gameState.ownerId);
+  console.log('Current owner:', owner ? owner.name : 'Unknown');
+  console.log('Your name:', gameState.players.find(p => p.id === playerId)?.name);
+
+  if (!owner) {
+    console.log('No owner found');
+    return;
+  }
+
+  console.log(`To become owner, save the owner's name and reload:`);
+  console.log(`localStorage.setItem('shcrabble-userName', '${owner.name}')`);
+  console.log(`window.location.reload()`);
+  console.log('\nOr run: becomeOwner(true) to do it automatically');
+
+  if (arguments[0] === true) {
+    localStorage.setItem('shcrabble-userName', owner.name);
+    window.location.reload();
+  }
+}
+
 // Initialize socket connection
 function initSocket() {
   socket = io();
