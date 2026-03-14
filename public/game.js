@@ -10,9 +10,7 @@ let rackDragSource = null;
 
 // Initialize socket connection
 function initSocket() {
-  socket = io({
-    path: '/shcrabble/socket.io'
-  });
+  socket = io();
 
   socket.on('connect', () => {
     console.log('Connected to server');
