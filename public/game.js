@@ -928,18 +928,18 @@ function passTurn() {
 
 function exchangeTilesClick() {
   if (exchangeMode) {
-    // Confirm exchange
+    // Execute exchange
     if (tilesToExchange.length === 0) {
       showMessage('Select at least one tile to exchange', 'error');
       return;
     }
 
-    if (confirm(`Exchange ${tilesToExchange.length} tile(s)? This will end your turn.`)) {
-      socket.emit('exchange-tiles', { indices: tilesToExchange });
-      exchangeMode = false;
-      tilesToExchange = [];
-      document.getElementById('exchange-tiles-btn').textContent = 'Exchange Tiles';
-    }
+    socket.emit('exchange-tiles', { indices: tilesToExchange });
+    exchangeMode = false;
+    tilesToExchange = [];
+    document.getElementById('exchange-tiles-btn').textContent = i18n.t('exchangeTiles');
+    document.getElementById('cancel-exchange-btn').style.display = 'none';
+    showMessage('Exchanging tiles...', 'info');
   } else {
     // Enter exchange mode
     if (gameState.tilesRemaining < 7) {
@@ -950,8 +950,18 @@ function exchangeTilesClick() {
     tilesToExchange = [];
     updateRack();
     document.getElementById('exchange-tiles-btn').textContent = 'Confirm Exchange';
+    document.getElementById('cancel-exchange-btn').style.display = 'inline-block';
     showMessage('Click tiles to select for exchange, then click Confirm Exchange', 'info');
   }
+}
+
+function cancelExchange() {
+  exchangeMode = false;
+  tilesToExchange = [];
+  updateRack();
+  document.getElementById('exchange-tiles-btn').textContent = i18n.t('exchangeTiles');
+  document.getElementById('cancel-exchange-btn').style.display = 'none';
+  showMessage('', '');
 }
 
 function toggleTileForExchange(index) {
@@ -1018,6 +1028,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('submit-move-btn').addEventListener('click', submitMove);
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);
   document.getElementById('exchange-tiles-btn').addEventListener('click', exchangeTilesClick);
+  document.getElementById('cancel-exchange-btn').addEventListener('click', cancelExchange);
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
   document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
