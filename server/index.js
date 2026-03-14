@@ -187,9 +187,9 @@ io.on('connection', (socket) => {
       // New player joining (playerId already declared above)
       const player = game.addPlayer(playerId, playerName);
 
-      // Save player to database
+      // Save player to database (replace if already exists)
       await db.query(
-        'INSERT INTO players (id, session_id, player_name, player_index) VALUES (?, ?, ?, ?)',
+        'REPLACE INTO players (id, session_id, player_name, player_index) VALUES (?, ?, ?, ?)',
         [playerId, gameId, playerName, player.index]
       );
 
