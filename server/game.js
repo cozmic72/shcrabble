@@ -345,11 +345,14 @@ class Game {
     for (const p of placements) {
       // Check horizontal word
       const hWord = this.readWord(tempBoard, p.row, p.col, true);
-      if (hWord.length > 1) wordsToCheck.add(hWord);
+      // Count actual characters (not code units) to handle Unicode properly
+      const hWordLength = [...hWord].length;
+      if (hWordLength > 1) wordsToCheck.add(hWord);
 
       // Check vertical word
       const vWord = this.readWord(tempBoard, p.row, p.col, false);
-      if (vWord.length > 1) wordsToCheck.add(vWord);
+      const vWordLength = [...vWord].length;
+      if (vWordLength > 1) wordsToCheck.add(vWord);
     }
 
     console.log('Words to validate:', Array.from(wordsToCheck));
