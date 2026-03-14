@@ -44,6 +44,7 @@ class Game {
 
     this.tiles = [];
     this.tileBag = [];
+    this.allLetters = []; // Store all possible letters for wildcard validation
 
     lines.forEach(line => {
       const [letter, count, points] = line.split(',');
@@ -54,6 +55,11 @@ class Game {
       };
 
       this.tiles.push(tileInfo);
+
+      // Store non-blank letters for wildcard validation
+      if (letter !== 'blank') {
+        this.allLetters.push(letter);
+      }
 
       // Add tiles to bag
       for (let i = 0; i < parseInt(count); i++) {
@@ -365,13 +371,127 @@ class Game {
     const invalidWords = [];
     if (this.dictionary) {
       for (const word of wordsToCheck) {
-        if (!this.dictionary.isValidWord(word)) {
+        if (!this.isValidWordWithBlanks(word, tempBoard, placements)) {
           invalidWords.push(word);
         }
       }
     }
 
     return invalidWords;
+  }
+
+  // Check if a word is valid, considering blank tiles
+  // We need to check the board to find which positions have blanks
+  isValidWordWithBlanks(word, board, placements) {
+    // First, find all positions of this word on the board
+    const wordPositions = this.findWordPositions(word, board);
+
+    if (wordPositions.length === 0) {
+      // Word not found on board, just validate normally
+      return this.dictionary.isValidWord(word);
+    }
+
+    // For each occurrence of the word, check if it's valid
+    for (const positions of wordPositions) {
+      const blankPositions = [];
+
+      // Check which positions are blank tiles
+      for (let i = 0; i < positions.length; i++) {
+        const [row, col] = positions[i];
+        if (board[row][col].isBlank) {
+          blankPositions.push(i);
+        }
+      }
+
+      // Try all combinations for this word occurrence
+      if (blankPositions.length === 0) {
+        if (this.dictionary.isValidWord(word)) {
+          return true;
+        }
+      } else {
+        if (this.checkBlankCombinations(word, blankPositions)) {
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  // Find all occurrences of a word on the board and return their positions
+  findWordPositions(word, board) {
+    const positions = [];
+    const wordLength = [...word].length;
+
+    // Search horizontally
+    for (let row = 0; row < 15; row++) {
+      for (let col = 0; col <= 15 - wordLength; col++) {
+        let match = true;
+        const pos = [];
+        const wordArray = [...word];
+
+        for (let i = 0; i < wordArray.length; i++) {
+          if (board[row][col + i].letter !== wordArray[i]) {
+            match = false;
+            break;
+          }
+          pos.push([row, col + i]);
+        }
+
+        if (match) {
+          positions.push(pos);
+        }
+      }
+    }
+
+    // Search vertically
+    for (let col = 0; col < 15; col++) {
+      for (let row = 0; row <= 15 - wordLength; row++) {
+        let match = true;
+        const pos = [];
+        const wordArray = [...word];
+
+        for (let i = 0; i < wordArray.length; i++) {
+          if (board[row + i][col].letter !== wordArray[i]) {
+            match = false;
+            break;
+          }
+          pos.push([row + i, col]);
+        }
+
+        if (match) {
+          positions.push(pos);
+        }
+      }
+    }
+
+    return positions;
+  }
+
+  // Check if any combination of letters for blank positions creates a valid word
+  checkBlankCombinations(word, blankPositions) {
+    const wordArray = [...word];
+    return this.tryBlankCombinations(wordArray, blankPositions, 0);
+  }
+
+  // Recursively try all letter combinations for blank positions
+  tryBlankCombinations(wordArray, blankPositions, posIndex) {
+    if (posIndex >= blankPositions.length) {
+      // All blanks filled, check if valid
+      return this.dictionary.isValidWord(wordArray.join(''));
+    }
+
+    const blankPos = blankPositions[posIndex];
+
+    // Try each possible letter
+    for (const letter of this.allLetters) {
+      wordArray[blankPos] = letter;
+      if (this.tryBlankCombinations([...wordArray], blankPositions, posIndex + 1)) {
+        return true; // Found a valid combination
+      }
+    }
+
+    return false; // No valid combination found
   }
 
   // Read word horizontally or vertically from a position
