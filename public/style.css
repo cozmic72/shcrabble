@@ -310,6 +310,21 @@ body {
   margin-bottom: 40px;
 }
 
+#lobby-screen .copyright {
+  margin-bottom: 20px;
+  font-size: 0.9em;
+  opacity: 0.7;
+}
+
+#lobby-screen .copyright a {
+  color: #667eea;
+  text-decoration: none;
+}
+
+#lobby-screen .copyright a:hover {
+  text-decoration: underline;
+}
+
 #lobby-options {
   display: flex;
   gap: 30px;
