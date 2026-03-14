@@ -90,8 +90,10 @@ io.on('connection', (socket) => {
       // Use userId if provided, otherwise generate new ID
       const playerId = userId || uuidv4();
 
-      // Check if this is a reconnection
-      const existingPlayer = game.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
+      // Check if this is a reconnection (by userId or by name)
+      const existingPlayer = game.players.find(p =>
+        p.id === playerId || p.name.toLowerCase() === playerName.toLowerCase()
+      );
 
       if (existingPlayer) {
         // Reconnect existing player
