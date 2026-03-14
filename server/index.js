@@ -32,6 +32,9 @@ const pendingVotes = new Map(); // voteId -> { gameId, playerId, playerName, pla
 // Initialize dictionary
 const dictionary = new Dictionary();
 
+// Parse JSON bodies
+app.use(express.json());
+
 // Serve static files from public directory
 app.use('/shcrabble', express.static(path.join(__dirname, '../public')));
 
