@@ -19,7 +19,7 @@ const BONUS_SQUARES = {
 };
 
 class Game {
-  constructor(gameId, dictionary = null) {
+  constructor(gameId, dictionary = null, options = {}) {
     this.gameId = gameId;
     this.board = this.createEmptyBoard();
     this.players = [];
@@ -32,6 +32,8 @@ class Game {
     this.turnsTaken = 0;
     this.ownerId = null; // Player ID of game creator
     this.dictionary = dictionary; // Reference to dictionary for word validation
+    this.rackSize = options.rackSize || 9; // Customizable rack size
+    this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
   }
 
   // Load tiles from CSV
@@ -110,7 +112,7 @@ class Game {
       id: playerId,
       name: playerName,
       score: 0,
-      rack: this.drawTiles(9),
+      rack: this.drawTiles(this.rackSize),
       index: this.players.length,
       connected: true
     };
@@ -473,15 +475,23 @@ class Game {
       status: this.status,
       locked: this.locked,
       turnsTaken: this.turnsTaken,
-      ownerId: this.ownerId
+      ownerId: this.ownerId,
+      rackSize: this.rackSize,
+      allowVoting: this.allowVoting
     });
   }
 
   // Deserialize from database
   static deserialize(gameId, data, dictionary = null) {
-    const game = new Game(gameId, dictionary);
     // MySQL returns JSON columns as objects, not strings
     const state = typeof data === 'string' ? JSON.parse(data) : data;
+
+    const options = {
+      rackSize: state.rackSize || 9,
+      allowVoting: state.allowVoting !== undefined ? state.allowVoting : true
+    };
+
+    const game = new Game(gameId, dictionary, options);
     game.board = state.board;
     game.players = state.players || [];
     game.spectators = state.spectators || [];

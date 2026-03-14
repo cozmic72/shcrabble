@@ -41,10 +41,12 @@ app.get('/shcrabble/api/health', (req, res) => {
 });
 
 // Create new game
-app.get('/shcrabble/api/create', async (req, res) => {
+app.post('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const game = new Game(gameId, dictionary);
+    const { rackSize = 9, allowVoting = true } = req.body;
+
+    const game = new Game(gameId, dictionary, { rackSize, allowVoting });
 
     // Store in memory
     games.set(gameId, game);
@@ -250,16 +252,25 @@ io.on('connection', (socket) => {
       const invalidWords = game.validatePlacements(placements);
 
       if (invalidWords.length > 0) {
-        // Invalid words found - ask player if they want to put it to a vote
-        const score = game.calculateScore(placements);
+        // Invalid words found
+        if (game.allowVoting) {
+          // Ask player if they want to put it to a vote
+          const score = game.calculateScore(placements);
 
-        socket.emit('invalid-word-prompt', {
-          invalidWords,
-          placements,
-          score
-        });
+          socket.emit('invalid-word-prompt', {
+            invalidWords,
+            placements,
+            score
+          });
 
-        console.log(`Invalid words detected: ${invalidWords.join(', ')}, asking player to confirm vote`);
+          console.log(`Invalid words detected: ${invalidWords.join(', ')}, asking player to confirm vote`);
+        } else {
+          // Voting disabled - reject the move
+          socket.emit('error', {
+            message: `Invalid words: ${invalidWords.join(', ')}`
+          });
+          console.log(`Invalid words detected: ${invalidWords.join(', ')}, move rejected (voting disabled)`);
+        }
         return;
       }
 

@@ -624,18 +624,62 @@ function getDragAfterElement(container, x) {
 }
 
 // Lobby functions
+function showCreateGameDialog() {
+  // Prepopulate name from localStorage
+  const savedName = getUserName();
+  if (savedName) {
+    document.getElementById('create-name').value = savedName;
+  }
+  document.getElementById('create-game-dialog').style.display = 'flex';
+}
+
+function showJoinGameDialog() {
+  // Prepopulate name from localStorage
+  const savedName = getUserName();
+  if (savedName) {
+    document.getElementById('join-name').value = savedName;
+  }
+
+  // Check URL params for game ID
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.has('game')) {
+    document.getElementById('game-id').value = urlParams.get('game');
+  }
+
+  document.getElementById('join-game-dialog').style.display = 'flex';
+}
+
 function createGame() {
-  const name = document.getElementById('host-name').value.trim();
+  const name = document.getElementById('create-name').value.trim();
+  const rackSize = parseInt(document.getElementById('rack-size').value);
+  const allowVoting = document.getElementById('allow-voting').checked;
+
   if (!name) {
     alert('Please enter your name');
     return;
   }
 
+  if (rackSize < 5 || rackSize > 12) {
+    alert('Rack size must be between 5 and 12');
+    return;
+  }
+
   saveUserName(name);
 
-  fetch('/shcrabble/api/create')
+  fetch('/shcrabble/api/create', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      rackSize,
+      allowVoting
+    })
+  })
     .then(res => res.json())
     .then(data => {
+      document.getElementById('create-game-dialog').style.display = 'none';
+
       const inviteLink = window.location.origin + data.inviteLink;
       document.getElementById('invite-link').value = inviteLink;
       document.getElementById('invite-link-container').style.display = 'block';
@@ -656,13 +700,6 @@ function joinGame() {
   const name = document.getElementById('join-name').value.trim();
   let gameId = document.getElementById('game-id').value.trim();
 
-  // Check URL params
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.has('game')) {
-    gameId = urlParams.get('game');
-    document.getElementById('game-id').value = gameId;
-  }
-
   if (!name) {
     alert('Please enter your name');
     return;
@@ -674,6 +711,8 @@ function joinGame() {
   }
 
   saveUserName(name);
+
+  document.getElementById('join-game-dialog').style.display = 'none';
 
   socket.emit('join-game', {
     gameId: gameId,
@@ -902,22 +941,19 @@ function showGameEndedDialog(finalScores) {
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
 
-  // Prepopulate name fields from localStorage
-  const savedName = getUserName();
-  if (savedName) {
-    document.getElementById('host-name').value = savedName;
-    document.getElementById('join-name').value = savedName;
-  }
-
-  // Check if joining via link
+  // Check if joining via link - auto-open join dialog
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('game')) {
-    document.getElementById('game-id').value = urlParams.get('game');
+    showJoinGameDialog();
   }
 
-  // Event listeners
-  document.getElementById('create-game-btn').addEventListener('click', createGame);
-  document.getElementById('join-game-btn').addEventListener('click', joinGame);
+  // Event listeners for lobby buttons
+  document.getElementById('create-game-btn').addEventListener('click', showCreateGameDialog);
+  document.getElementById('join-game-btn').addEventListener('click', showJoinGameDialog);
+
+  // Event listeners for dialog confirm buttons
+  document.getElementById('create-game-confirm-btn').addEventListener('click', createGame);
+  document.getElementById('join-game-confirm-btn').addEventListener('click', joinGame);
   document.getElementById('copy-link-btn').addEventListener('click', copyInviteLink);
   document.getElementById('submit-move-btn').addEventListener('click', submitMove);
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);

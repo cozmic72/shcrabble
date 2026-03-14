@@ -89,6 +89,58 @@
     </div>
   </div>
 
+  <!-- Create Game Dialog -->
+  <div id="create-game-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2>Create New Game</h2>
+        <button class="close-dialog" data-dialog="create-game-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="setting-item">
+          <label>Your Name</label>
+          <input type="text" id="create-name" placeholder="Your name" maxlength="20">
+        </div>
+        <div class="setting-item">
+          <label>Tiles per Rack</label>
+          <input type="number" id="rack-size" min="5" max="12" value="9">
+        </div>
+        <div class="setting-item">
+          <label class="checkbox-label">
+            <input type="checkbox" id="allow-voting" checked>
+            <span>Allow voting on invalid words</span>
+          </label>
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="create-game-confirm-btn" class="primary-btn">Create Game</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Join Game Dialog -->
+  <div id="join-game-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2>Join Game</h2>
+        <button class="close-dialog" data-dialog="join-game-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="setting-item">
+          <label>Your Name</label>
+          <input type="text" id="join-name" placeholder="Your name" maxlength="20">
+        </div>
+        <div class="setting-item">
+          <label>Game ID</label>
+          <input type="text" id="game-id" placeholder="Game ID (or use link)">
+        </div>
+      </div>
+      <div class="dialog-footer">
+        <button id="join-game-confirm-btn" class="primary-btn">Join Game</button>
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Landing/Lobby Screen -->
     <div id="lobby-screen">
@@ -106,18 +158,8 @@
       <p class="copyright">&copy; <a href="https://joro.io" target="_blank">joro.io</a></p>
 
       <div id="lobby-options">
-        <div class="lobby-option">
-          <h2 data-i18n="createNewGame">Create New Game</h2>
-          <input type="text" id="host-name" data-i18n="yourName" data-i18n-placeholder="true" placeholder="Your name" maxlength="20">
-          <button id="create-game-btn" data-i18n="createGameBtn">Create Game</button>
-        </div>
-
-        <div class="lobby-option">
-          <h2 data-i18n="joinGame">Join Game</h2>
-          <input type="text" id="join-name" data-i18n="yourName" data-i18n-placeholder="true" placeholder="Your name" maxlength="20">
-          <input type="text" id="game-id" data-i18n="gameId" data-i18n-placeholder="true" placeholder="Game ID (or use link)">
-          <button id="join-game-btn" data-i18n="joinGameBtn">Join Game</button>
-        </div>
+        <button id="create-game-btn" class="lobby-btn primary-btn" data-i18n="createGameBtn">Create Game</button>
+        <button id="join-game-btn" class="lobby-btn" data-i18n="joinGameBtn">Join Game</button>
       </div>
 
       <div id="invite-link-container" style="display: none;">
