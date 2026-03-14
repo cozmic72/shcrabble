@@ -2138,6 +2138,15 @@ function setupCustomTileEditor() {
     populateTileEditor();
   });
 
+  // Import CSV
+  document.getElementById('import-csv-btn').addEventListener('click', () => {
+    document.getElementById('csv-file-input').click();
+  });
+
+  document.getElementById('csv-file-input').addEventListener('change', () => {
+    importTilesFromCSV();
+  });
+
   // Export as CSV
   document.getElementById('export-csv-btn').addEventListener('click', () => {
     exportTilesAsCSV();
@@ -2225,6 +2234,65 @@ function exportTilesAsCSV() {
   a.download = 'custom_tiles.csv';
   a.click();
   window.URL.revokeObjectURL(url);
+}
+
+function importTilesFromCSV() {
+  const fileInput = document.getElementById('csv-file-input');
+  const file = fileInput.files[0];
+
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const content = e.target.result;
+      const lines = content.trim().split('\n');
+
+      // Skip header if present
+      const startIdx = lines[0].toLowerCase().includes('letter') ? 1 : 0;
+
+      const newTiles = [];
+      for (let i = startIdx; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const [letter, count, points] = line.split(',');
+
+        if (!letter || count === undefined || points === undefined) {
+          throw new Error(`Invalid CSV format at line ${i + 1}`);
+        }
+
+        newTiles.push({
+          letter: letter.trim(),
+          count: parseInt(count.trim()),
+          points: parseInt(points.trim())
+        });
+      }
+
+      if (newTiles.length === 0) {
+        throw new Error('No valid tiles found in CSV');
+      }
+
+      // Update customTiles and refresh the editor
+      customTiles = newTiles;
+      populateTileEditor();
+      showMessage('CSV imported successfully!', 'success');
+
+    } catch (err) {
+      showMessage(`Error importing CSV: ${err.message}`, 'error');
+      console.error('CSV import error:', err);
+    }
+
+    // Clear file input so same file can be selected again
+    fileInput.value = '';
+  };
+
+  reader.onerror = () => {
+    showMessage('Error reading file', 'error');
+    fileInput.value = '';
+  };
+
+  reader.readAsText(file);
 }
 
 function getSelectedTileDistribution() {

@@ -199,7 +199,11 @@
         </div>
       </div>
       <div class="dialog-footer" style="display: flex; gap: 10px; justify-content: space-between;">
-        <button id="export-csv-btn">Export as CSV</button>
+        <div style="display: flex; gap: 10px;">
+          <button id="import-csv-btn">Import CSV</button>
+          <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+          <button id="export-csv-btn">Export as CSV</button>
+        </div>
         <div style="display: flex; gap: 10px;">
           <button id="reset-tiles-btn">Reset to Default</button>
           <button id="save-tiles-btn" class="primary-btn">Save</button>
