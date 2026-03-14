@@ -508,7 +508,7 @@ class Game {
     let wordMultiplier = 1;
 
     placements.forEach(p => {
-      let letterScore = p.points || 1;
+      let letterScore = p.points !== undefined ? p.points : 1;
       const bonus = this.board[p.row][p.col].bonus;
 
       if (bonus === 'DL') letterScore *= 2;
