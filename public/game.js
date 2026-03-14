@@ -557,14 +557,13 @@ function updateRack() {
 
     if (isNewTile) {
       tileDiv.classList.add('new-tile');
-      // Stagger the animation for multiple new tiles
-      tileDiv.style.animationDelay = `${displayIndex * 0.1}s`;
+      // All new tiles animate together
     } else if (isShiftingTile) {
       tileDiv.classList.add('sliding');
       // Calculate how far to slide from (in pixels)
       const slideDistance = -60 * numNewTiles; // 50px tile + 10px gap
       tileDiv.style.setProperty('--slide-from', `${slideDistance}px`);
-      tileDiv.style.animationDelay = `${displayIndex * 0.05}s`;
+      // All existing tiles slide together in unison
     }
 
     if (tile.isBlank) {
