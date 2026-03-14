@@ -10,6 +10,7 @@ let rackDragSource = null;
 let previousRackSize = 0;
 let exchangeMode = false;
 let tilesToExchange = [];
+let currentVoteId = null;
 
 // Save user preferences
 function saveUserName(name) {
@@ -162,6 +163,25 @@ function initSocket() {
   socket.on('game-ended', (data) => {
     gameState = data.gameState;
     showGameEndedDialog(data.finalScores);
+  });
+
+  socket.on('vote-pending', (data) => {
+    currentVoteId = data.voteId;
+    showMessage(data.message, 'info');
+  });
+
+  socket.on('vote-request', (data) => {
+    currentVoteId = data.voteId;
+    const wordsText = data.invalidWords.join(', ');
+    document.getElementById('vote-question').textContent =
+      `${data.playerName} placed '${wordsText}', but it's not in the dictionary. Will you allow this move?`;
+    document.getElementById('vote-dialog').style.display = 'flex';
+  });
+
+  socket.on('vote-result', (data) => {
+    document.getElementById('vote-dialog').style.display = 'none';
+    showMessage(data.message, data.accepted ? 'success' : 'error');
+    currentVoteId = null;
   });
 }
 
@@ -870,6 +890,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
   document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
+
+  // Vote button handlers
+  document.getElementById('vote-accept-btn').addEventListener('click', () => {
+    if (currentVoteId) {
+      socket.emit('submit-vote', { voteId: currentVoteId, accept: true });
+      document.getElementById('vote-dialog').style.display = 'none';
+    }
+  });
+
+  document.getElementById('vote-reject-btn').addEventListener('click', () => {
+    if (currentVoteId) {
+      socket.emit('submit-vote', { voteId: currentVoteId, accept: false });
+      document.getElementById('vote-dialog').style.display = 'none';
+    }
+  });
 
   // Allow board squares to receive drops
   document.addEventListener('dragover', (e) => {

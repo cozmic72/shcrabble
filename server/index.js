@@ -26,6 +26,9 @@ const READLEX_PATH = path.join(__dirname, '../data/readlex/readlex.json');
 // In-memory game storage (could move to DB for persistence)
 const games = new Map();
 
+// In-memory pending votes for invalid words
+const pendingVotes = new Map(); // voteId -> { gameId, playerId, playerName, placements, invalidWords, votes: Map(playerId -> boolean), score }
+
 // Initialize dictionary
 const dictionary = new Dictionary();
 
@@ -243,10 +246,48 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Validate and place tiles
-      game.placeTiles(player.index, placements);
+      // Validate - returns array of invalid words
+      const invalidWords = game.placeTiles(player.index, placements);
 
-      // Calculate score
+      if (invalidWords.length > 0) {
+        // Invalid words found - initiate voting
+        const voteId = uuidv4();
+        const score = game.calculateScore(placements);
+
+        pendingVotes.set(voteId, {
+          gameId,
+          playerId,
+          playerName: player.name,
+          placements,
+          invalidWords,
+          votes: new Map(),
+          score
+        });
+
+        // Notify player that vote is pending
+        socket.emit('vote-pending', {
+          voteId,
+          invalidWords,
+          message: `Waiting for other players to vote on: ${invalidWords.join(', ')}`
+        });
+
+        // Ask other players to vote
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          if (s.data.playerId !== playerId && !s.data.isSpectator) {
+            s.emit('vote-request', {
+              voteId,
+              playerName: player.name,
+              invalidWords
+            });
+          }
+        }
+
+        console.log(`Vote ${voteId} initiated for words: ${invalidWords.join(', ')}`);
+        return;
+      }
+
+      // All words valid - proceed with move
       const score = game.calculateScore(placements);
       player.score += score;
 
@@ -279,6 +320,110 @@ io.on('connection', (socket) => {
 
     } catch (err) {
       console.error('Error making move:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  // Submit vote on word validity
+  socket.on('submit-vote', async ({ voteId, accept }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const vote = pendingVotes.get(voteId);
+
+      if (!vote || vote.gameId !== gameId) {
+        socket.emit('error', { message: 'Vote not found' });
+        return;
+      }
+
+      // Record vote
+      vote.votes.set(playerId, accept);
+
+      const game = games.get(gameId);
+      const otherPlayers = game.players.filter(p => p.id !== vote.playerId);
+      const allVoted = otherPlayers.every(p => vote.votes.has(p.id));
+
+      console.log(`Vote received: ${accept ? 'accept' : 'reject'} from ${playerId}, ${vote.votes.size}/${otherPlayers.length} votes`);
+
+      if (allVoted) {
+        // Tally votes - accept if at least one player voted yes
+        const acceptVotes = Array.from(vote.votes.values()).filter(v => v).length;
+        const accepted = acceptVotes > 0;
+
+        console.log(`Vote complete: ${acceptVotes} accept votes, ${accepted ? 'ACCEPTED' : 'REJECTED'}`);
+
+        if (accepted) {
+          // Apply the move
+          const player = game.players.find(p => p.id === vote.playerId);
+          player.score += vote.score;
+          game.nextTurn();
+
+          // Update database
+          await db.query(
+            'UPDATE sessions SET game_state = ?, current_turn = ? WHERE id = ?',
+            [game.serialize(), game.currentPlayerIndex, gameId]
+          );
+
+          await db.query(
+            'UPDATE players SET score = ? WHERE id = ?',
+            [player.score, vote.playerId]
+          );
+
+          // Notify all players
+          const sockets = await io.in(gameId).fetchSockets();
+          for (const s of sockets) {
+            s.emit('vote-result', {
+              voteId,
+              accepted: true,
+              message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
+            });
+
+            s.emit('game-update', {
+              gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
+              lastMove: {
+                playerId: vote.playerId,
+                playerName: vote.playerName,
+                score: vote.score
+              }
+            });
+          }
+        } else {
+          // Reject the move - undo placement
+          const player = game.players.find(p => p.id === vote.playerId);
+
+          // Return tiles to rack
+          vote.placements.forEach(p => {
+            const idx = player.rack.findIndex(t =>
+              (t.isBlank && p.isBlank) || (!t.isBlank && t.letter === p.letter)
+            );
+            // Tiles were already removed, need to add them back
+            player.rack.push({
+              letter: p.letter,
+              points: p.points,
+              isBlank: p.isBlank
+            });
+          });
+
+          // Notify all players
+          const sockets = await io.in(gameId).fetchSockets();
+          for (const s of sockets) {
+            s.emit('vote-result', {
+              voteId,
+              accepted: false,
+              message: `Move rejected by vote (${vote.invalidWords.join(', ')})`
+            });
+
+            // Send updated game state with tiles back in rack
+            s.emit('game-update', {
+              gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+            });
+          }
+        }
+
+        pendingVotes.delete(voteId);
+      }
+
+    } catch (err) {
+      console.error('Error processing vote:', err);
       socket.emit('error', { message: err.message });
     }
   });

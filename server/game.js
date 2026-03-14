@@ -359,16 +359,17 @@ class Game {
       throw new Error('Move must form at least one word');
     }
 
-    // Check dictionary if available
+    // Check dictionary if available - return list of invalid words
+    const invalidWords = [];
     if (this.dictionary) {
       for (const word of wordsToCheck) {
         if (!this.dictionary.isValidWord(word)) {
-          throw new Error(`Invalid word: ${word}`);
+          invalidWords.push(word);
         }
       }
     }
 
-    return true;
+    return invalidWords;
   }
 
   // Read word horizontally or vertically from a position
