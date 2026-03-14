@@ -27,8 +27,8 @@ body {
 /* Burger Menu */
 #burger-menu {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 15px;
+  right: 15px;
   z-index: 1000;
 }
 
@@ -279,6 +279,7 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   max-width: 600px;
   margin: 50px auto;
+  position: relative;
 }
 
 #lobby-screen h1 {
@@ -383,6 +384,7 @@ body {
   border-radius: 12px;
   padding: 20px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  position: relative;
 }
 
 #game-header {
