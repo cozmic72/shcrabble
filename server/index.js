@@ -387,7 +387,8 @@ io.on('connection', (socket) => {
 
         // Send spectator confirmation
         socket.emit('joined', {
-          spectatorId,
+          playerId: spectatorId,
+          playerIndex: null,
           gameState: game.getState(null),
           isSpectator: true
         });

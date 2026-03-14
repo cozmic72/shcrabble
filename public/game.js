@@ -522,7 +522,11 @@ function updatePlayersList() {
     // Allow spectators to click to view player's tiles
     if (playerIndex === null) {
       card.style.cursor = 'pointer';
-      card.addEventListener('click', () => showPlayerTiles(player));
+      card.addEventListener('click', (e) => {
+        // Don't trigger if clicking remove button
+        if (e.target.closest('.remove-player-btn')) return;
+        showPlayerTiles(player);
+      });
     }
 
     playersList.appendChild(card);
