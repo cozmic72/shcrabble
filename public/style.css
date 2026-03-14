@@ -426,11 +426,17 @@ body {
 }
 
 .square.occupied {
-  background: #f0e68c;
+  background: linear-gradient(135deg, #f5e5a3 0%, #f0e68c 50%, #e6d77a 100%);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
 .square.placement {
-  background: #98fb98 !important;
+  background: linear-gradient(135deg, #b3f5b3 0%, #98fb98 50%, #7ee67e 100%) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
 .bonus-label {
@@ -444,6 +450,8 @@ body {
 .tile-letter {
   font-size: 1.3em;
   color: #333;
+  text-shadow: 0 1px 1px rgba(255, 255, 255, 0.5);
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.1));
 }
 
 /* Rack */
@@ -471,7 +479,7 @@ body {
 .rack-tile {
   width: 50px;
   height: 50px;
-  background: #f0e68c;
+  background: linear-gradient(135deg, #f5e5a3 0%, #f0e68c 50%, #e6d77a 100%);
   border: 2px solid #daa520;
   border-radius: 4px;
   display: flex;
@@ -481,6 +489,11 @@ body {
   font-weight: bold;
   cursor: grab;
   user-select: none;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1);
+  transition: transform 0.1s, box-shadow 0.1s;
+  position: relative;
 }
 
 .rack-tile:active {
@@ -488,11 +501,19 @@ body {
 }
 
 .rack-tile.dragging {
-  opacity: 0.5;
+  opacity: 1;
+  transform: scale(1.1) rotate(3deg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+.rack-tile.drag-over {
+  margin-left: 60px;
+  transition: margin-left 0.2s ease;
 }
 
 .rack-tile.blank {
-  background: #ffe4b5;
+  background: linear-gradient(135deg, #fff0d0 0%, #ffe4b5 50%, #ffd89b 100%);
   font-style: italic;
 }
 

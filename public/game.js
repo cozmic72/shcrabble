@@ -296,6 +296,18 @@ function handleDragEnd(e) {
 function handleRackDragOver(e) {
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
+
+  if (!draggedFromRack || !rackDragSource) return;
+
+  const rack = document.getElementById('rack');
+  const afterElement = getDragAfterElement(rack, e.clientX);
+
+  // Live preview: temporarily insert dragged element at new position
+  if (afterElement == null) {
+    rack.appendChild(rackDragSource);
+  } else if (afterElement !== rackDragSource.nextSibling) {
+    rack.insertBefore(rackDragSource, afterElement);
+  }
 }
 
 // Handle drop on rack for reordering
