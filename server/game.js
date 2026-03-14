@@ -346,33 +346,56 @@ class Game {
     });
 
     // Check horizontal and vertical word for each placed tile
-    const wordsToCheck = new Set();
+    const wordsToCheck = []; // Array of {word, positions: [{row, col}]}
 
     for (const p of placements) {
       // Check horizontal word
-      const hWord = this.readWord(tempBoard, p.row, p.col, true);
+      const hWordData = this.readWordWithPositions(tempBoard, p.row, p.col, true);
       // Count actual characters (not code units) to handle Unicode properly
-      const hWordLength = [...hWord].length;
-      if (hWordLength > 1) wordsToCheck.add(hWord);
+      const hWordLength = [...hWordData.word].length;
+      if (hWordLength > 1) {
+        wordsToCheck.push(hWordData);
+      }
 
       // Check vertical word
-      const vWord = this.readWord(tempBoard, p.row, p.col, false);
-      const vWordLength = [...vWord].length;
-      if (vWordLength > 1) wordsToCheck.add(vWord);
+      const vWordData = this.readWordWithPositions(tempBoard, p.row, p.col, false);
+      const vWordLength = [...vWordData.word].length;
+      if (vWordLength > 1) {
+        wordsToCheck.push(vWordData);
+      }
     }
 
-    console.log('Words to validate:', Array.from(wordsToCheck));
+    // Remove duplicates (same positions)
+    const uniqueWords = [];
+    for (const wordData of wordsToCheck) {
+      const posKey = wordData.positions.map(p => `${p.row},${p.col}`).join('|');
+      if (!uniqueWords.some(w => w.positions.map(p => `${p.row},${p.col}`).join('|') === posKey)) {
+        uniqueWords.push(wordData);
+      }
+    }
 
-    if (wordsToCheck.size === 0) {
+    console.log('Words to validate:', uniqueWords.map(w => w.word));
+
+    if (uniqueWords.length === 0) {
       throw new Error('Move must form at least one word');
     }
 
     // Check dictionary if available - return list of invalid words
     const invalidWords = [];
     if (this.dictionary) {
-      for (const word of wordsToCheck) {
-        if (!this.isValidWordWithBlanks(word, tempBoard, placements)) {
-          invalidWords.push(word);
+      for (const wordData of uniqueWords) {
+        // Find which positions have blank tiles
+        const blankPositions = [];
+        for (let i = 0; i < wordData.positions.length; i++) {
+          const pos = wordData.positions[i];
+          if (tempBoard[pos.row][pos.col].isBlank) {
+            blankPositions.push(i);
+          }
+        }
+
+        // Check if this word (with blanks) is valid
+        if (!this.isValidWordWithBlanks(wordData.word, blankPositions)) {
+          invalidWords.push(wordData.word);
         }
       }
     }
@@ -381,95 +404,13 @@ class Game {
   }
 
   // Check if a word is valid, considering blank tiles
-  // We need to check the board to find which positions have blanks
-  isValidWordWithBlanks(word, board, placements) {
-    // First, find all positions of this word on the board
-    const wordPositions = this.findWordPositions(word, board);
-
-    if (wordPositions.length === 0) {
-      // Word not found on board, just validate normally
+  isValidWordWithBlanks(word, blankPositions) {
+    if (blankPositions.length === 0) {
+      // No blanks, just check normally
       return this.dictionary.isValidWord(word);
     }
 
-    // For each occurrence of the word, check if it's valid
-    for (const positions of wordPositions) {
-      const blankPositions = [];
-
-      // Check which positions are blank tiles
-      for (let i = 0; i < positions.length; i++) {
-        const [row, col] = positions[i];
-        if (board[row][col].isBlank) {
-          blankPositions.push(i);
-        }
-      }
-
-      // Try all combinations for this word occurrence
-      if (blankPositions.length === 0) {
-        if (this.dictionary.isValidWord(word)) {
-          return true;
-        }
-      } else {
-        if (this.checkBlankCombinations(word, blankPositions)) {
-          return true;
-        }
-      }
-    }
-
-    return false;
-  }
-
-  // Find all occurrences of a word on the board and return their positions
-  findWordPositions(word, board) {
-    const positions = [];
-    const wordLength = [...word].length;
-
-    // Search horizontally
-    for (let row = 0; row < 15; row++) {
-      for (let col = 0; col <= 15 - wordLength; col++) {
-        let match = true;
-        const pos = [];
-        const wordArray = [...word];
-
-        for (let i = 0; i < wordArray.length; i++) {
-          if (board[row][col + i].letter !== wordArray[i]) {
-            match = false;
-            break;
-          }
-          pos.push([row, col + i]);
-        }
-
-        if (match) {
-          positions.push(pos);
-        }
-      }
-    }
-
-    // Search vertically
-    for (let col = 0; col < 15; col++) {
-      for (let row = 0; row <= 15 - wordLength; row++) {
-        let match = true;
-        const pos = [];
-        const wordArray = [...word];
-
-        for (let i = 0; i < wordArray.length; i++) {
-          if (board[row + i][col].letter !== wordArray[i]) {
-            match = false;
-            break;
-          }
-          pos.push([row + i, col]);
-        }
-
-        if (match) {
-          positions.push(pos);
-        }
-      }
-    }
-
-    return positions;
-  }
-
-  // Check if any combination of letters for blank positions creates a valid word
-  checkBlankCombinations(word, blankPositions) {
+    // Try all combinations of letters for blank positions
     const wordArray = [...word];
     return this.tryBlankCombinations(wordArray, blankPositions, 0);
   }
@@ -523,6 +464,40 @@ class Game {
     }
 
     return word;
+  }
+
+  // Read word with positions (for blank tile validation)
+  readWordWithPositions(board, row, col, horizontal) {
+    let word = '';
+    const positions = [];
+
+    if (horizontal) {
+      // Find start and end of word
+      let startCol = col;
+      let endCol = col;
+
+      while (startCol > 0 && board[row][startCol - 1].letter) startCol--;
+      while (endCol < 14 && board[row][endCol + 1].letter) endCol++;
+
+      for (let c = startCol; c <= endCol; c++) {
+        word += board[row][c].letter || '';
+        positions.push({row, col: c});
+      }
+    } else {
+      // Find start and end of word
+      let startRow = row;
+      let endRow = row;
+
+      while (startRow > 0 && board[startRow - 1][col].letter) startRow--;
+      while (endRow < 14 && board[endRow + 1][col].letter) endRow++;
+
+      for (let r = startRow; r <= endRow; r++) {
+        word += board[r][col].letter || '';
+        positions.push({row: r, col});
+      }
+    }
+
+    return {word, positions};
   }
 
   // Calculate score for a move
