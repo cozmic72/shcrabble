@@ -284,9 +284,12 @@ io.on('connection', (socket) => {
   // Validate word
   socket.on('validate-word', ({ word }) => {
     try {
+      console.log(`Validating word: "${word}" (${word.length} chars)`);
       const isValid = dictionary.isValidWord(word);
+      console.log(`  Result: ${isValid}`);
       socket.emit('word-validated', { word, isValid });
     } catch (err) {
+      console.error('Validation error:', err);
       socket.emit('error', { message: err.message });
     }
   });
