@@ -1048,12 +1048,24 @@ document.addEventListener('DOMContentLoaded', () => {
       rackIndex = draggedTile.rackIndex;
     }
 
+    // If it's a blank tile, prompt for letter choice
+    let chosenLetter = draggedTile.letter;
+    if (draggedTile.isBlank) {
+      chosenLetter = prompt('Choose a letter for the blank tile (enter a Shavian character):');
+      if (!chosenLetter) {
+        // User cancelled
+        return;
+      }
+      // Trim to first character
+      chosenLetter = [...chosenLetter][0] || '';
+    }
+
     // Add new placement
     currentPlacements.push({
       row,
       col,
-      letter: draggedTile.letter,
-      points: draggedTile.points,
+      letter: chosenLetter,
+      points: draggedTile.isBlank ? 0 : draggedTile.points,
       isBlank: draggedTile.isBlank,
       rackIndex: rackIndex
     });
