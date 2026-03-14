@@ -18,6 +18,7 @@ let pendingBlankPlacement = null; // Stores pending blank tile placement data
 let lastPlacementPosition = null; // Track last tile placement for double-click continuation
 let lastMovePlacements = []; // Track placements from last move for highlighting
 let highlightFadeTimeout = null; // Timeout for fading highlight
+let watchedPlayerId = null; // For spectators: which player's rack to display
 
 // All Shavian letters for blank tile selection
 // First 40 letters in Unicode order (4 rows of 10)
@@ -465,9 +466,26 @@ function updateGameUI() {
   // Update game info
   updateTilesRemaining(gameState.tilesRemaining);
 
-  // Enable/disable submit button
-  const submitBtn = document.getElementById('submit-move-btn');
-  submitBtn.disabled = currentPlacements.length === 0 || gameState.currentPlayerIndex !== playerIndex;
+  // Update rack title for spectators
+  const rackTitle = document.querySelector('#rack-container h3');
+  if (playerIndex === null && watchedPlayerId) {
+    const watchedPlayer = gameState.players.find(p => p.id === watchedPlayerId);
+    if (watchedPlayer) {
+      rackTitle.textContent = `${watchedPlayer.name}'s Rack`;
+    }
+  }
+
+  // Hide move controls for spectators
+  const moveControls = document.getElementById('move-controls');
+  if (playerIndex === null) {
+    moveControls.style.display = 'none';
+  } else {
+    moveControls.style.display = 'flex';
+
+    // Enable/disable submit button
+    const submitBtn = document.getElementById('submit-move-btn');
+    submitBtn.disabled = currentPlacements.length === 0 || gameState.currentPlayerIndex !== playerIndex;
+  }
 
   // Show/hide end game button for owner or admin
   const endGameBtn = document.getElementById('end-game-btn');
@@ -519,14 +537,21 @@ function updatePlayersList() {
       ${removeBtn}
     `;
 
-    // Allow spectators to click to view player's tiles
+    // Allow spectators to click to switch watched player
     if (playerIndex === null) {
       card.style.cursor = 'pointer';
       card.addEventListener('click', (e) => {
         // Don't trigger if clicking remove button
         if (e.target.closest('.remove-player-btn')) return;
-        showPlayerTiles(player);
+        // Switch to watching this player
+        watchedPlayerId = player.id;
+        updateGameUI();
       });
+
+      // Highlight the currently watched player
+      if (watchedPlayerId === player.id) {
+        card.style.border = '3px solid #667eea';
+      }
     }
 
     playersList.appendChild(card);
@@ -753,13 +778,32 @@ function fadeLastMoveHighlight() {
 
 function updateRack() {
   const rackDiv = document.getElementById('rack');
-  const myPlayer = gameState.players.find(p => p.id === playerId);
-  if (!myPlayer || !myPlayer.rack) return;
 
-  // Build current visible rack (excluding placed tiles - they close the gap)
-  const visibleRack = myPlayer.rack
-    .map((tile, idx) => ({ tile, originalIndex: idx }))
-    .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
+  // For spectators, show the watched player's rack, or first player if none selected
+  let targetPlayer;
+  if (playerIndex === null) {
+    // Spectator mode
+    if (watchedPlayerId) {
+      targetPlayer = gameState.players.find(p => p.id === watchedPlayerId);
+    }
+    // Default to first player if no one is being watched
+    if (!targetPlayer && gameState.players.length > 0) {
+      targetPlayer = gameState.players[0];
+      watchedPlayerId = targetPlayer.id;
+    }
+  } else {
+    // Regular player mode
+    targetPlayer = gameState.players.find(p => p.id === playerId);
+  }
+
+  if (!targetPlayer || !targetPlayer.rack) return;
+
+  // Build current visible rack (for spectators, show all tiles; for players, exclude placed tiles)
+  const visibleRack = playerIndex === null
+    ? targetPlayer.rack.map((tile, idx) => ({ tile, originalIndex: idx }))
+    : targetPlayer.rack
+        .map((tile, idx) => ({ tile, originalIndex: idx }))
+        .filter(({ originalIndex }) => !currentPlacements.some(p => p.rackIndex === originalIndex));
 
   const currentRackSize = visibleRack.length;
   const hasNewTiles = !isRecalling && currentRackSize > previousRackSize;
@@ -808,21 +852,27 @@ function updateRack() {
     tileDiv.dataset.points = tile.points;
     tileDiv.dataset.isBlank = tile.isBlank;
 
-    // In exchange mode, make tiles clickable to select
-    if (exchangeMode) {
-      tileDiv.style.cursor = 'pointer';
-      if (tilesToExchange.includes(originalIndex)) {
-        tileDiv.style.opacity = '0.5';
-        tileDiv.style.border = '3px solid #667eea';
+    // Only make tiles interactive for actual players, not spectators
+    if (playerIndex !== null) {
+      // In exchange mode, make tiles clickable to select
+      if (exchangeMode) {
+        tileDiv.style.cursor = 'pointer';
+        if (tilesToExchange.includes(originalIndex)) {
+          tileDiv.style.opacity = '0.5';
+          tileDiv.style.border = '3px solid #667eea';
+        }
+        tileDiv.addEventListener('click', () => toggleTileForExchange(originalIndex));
+      } else {
+        // Make tiles draggable in normal mode
+        tileDiv.draggable = true;
+        tileDiv.addEventListener('dragstart', handleDragStart);
+        tileDiv.addEventListener('dragend', handleDragEnd);
+        // Add double-click handler to place tile after last placement
+        tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(originalIndex));
       }
-      tileDiv.addEventListener('click', () => toggleTileForExchange(originalIndex));
     } else {
-      // Make tiles draggable in normal mode
-      tileDiv.draggable = true;
-      tileDiv.addEventListener('dragstart', handleDragStart);
-      tileDiv.addEventListener('dragend', handleDragEnd);
-      // Add double-click handler to place tile after last placement
-      tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(originalIndex));
+      // Spectator mode - tiles are not interactive
+      tileDiv.style.cursor = 'default';
     }
 
     rackDiv.appendChild(tileDiv);
