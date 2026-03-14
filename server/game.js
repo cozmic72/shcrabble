@@ -28,7 +28,7 @@ class Game {
     this.tileBag = [];
     this.tiles = null;
     this.status = 'waiting'; // waiting, active, completed
-    this.locked = false; // true after first turn is taken
+    this.locked = false; // true after first round is complete (all players had one turn)
     this.turnsTaken = 0;
     this.ownerId = null; // Player ID of game creator
     this.dictionary = dictionary; // Reference to dictionary for word validation
@@ -116,7 +116,7 @@ class Game {
 
   addPlayer(playerId, playerName, userId = null) {
     if (this.locked) {
-      throw new Error('Game is locked - first turn has been taken');
+      throw new Error('Game is locked - first round is complete');
     }
 
     if (this.players.length >= 4) {
@@ -332,9 +332,11 @@ class Game {
     const newTiles = this.drawTiles(placements.length);
     player.rack.push(...newTiles);
 
-    // Lock game after first turn
+    // Track turns taken
     this.turnsTaken++;
-    if (this.turnsTaken === 1) {
+
+    // Lock game after first complete round (all players have had one turn)
+    if (this.turnsTaken >= this.players.length) {
       this.locked = true;
     }
 
