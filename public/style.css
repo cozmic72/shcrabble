@@ -428,6 +428,8 @@ body {
 
 .square.occupied {
   background: linear-gradient(135deg, #f5e5a3 0%, #f0e68c 50%, #e6d77a 100%);
+  border: 2px solid #daa520;
+  border-radius: 3px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
               inset 0 1px 0 rgba(255, 255, 255, 0.4),
               inset 0 -1px 0 rgba(0, 0, 0, 0.1);
@@ -435,6 +437,8 @@ body {
 
 .square.placement {
   background: linear-gradient(135deg, #b3f5b3 0%, #98fb98 50%, #7ee67e 100%) !important;
+  border: 2px solid #52b152 !important;
+  border-radius: 3px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2),
               inset 0 1px 0 rgba(255, 255, 255, 0.4),
               inset 0 -1px 0 rgba(0, 0, 0, 0.1);
