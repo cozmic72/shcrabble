@@ -1397,6 +1397,10 @@ function recallTiles() {
   // Set flag to prevent slide-in animation
   isRecalling = true;
 
+  // Reset previousRackSize to ensure tiles reappear correctly
+  // The rack will grow by the number of tiles being recalled
+  previousRackSize = Math.max(0, previousRackSize - currentPlacements.length);
+
   const board = document.getElementById('board');
   const rack = document.getElementById('rack');
   const rackRect = rack.getBoundingClientRect();
@@ -1455,18 +1459,21 @@ function recallTiles() {
     });
   });
 
-  // Wait for all animations to complete, then update state
-  const longestDelay = 400 + (currentPlacements.length * 50) + 100;
+  // Calculate animation duration before clearing placements
+  const numPlacements = currentPlacements.length;
+  const longestDelay = 400 + (numPlacements * 50) + 100;
+
+  // Immediately clear placements and update UI to show tiles back in rack
+  // This ensures tiles reappear immediately, not after animation completes
+  currentPlacements = [];
+  updateBoard();
+  updateGameUI();
+  showMessage(i18n.t('msgTilesRecalled'), '');
+  validateCurrentMove();
+
+  // Clear recall flag after animations complete to ensure no unwanted slide-in
   setTimeout(() => {
-    currentPlacements = [];
-    updateBoard();
-    updateGameUI();
-    showMessage(i18n.t('msgTilesRecalled'), '');
-    validateCurrentMove();
-    // Clear recall flag after a brief delay to ensure animations don't trigger
-    setTimeout(() => {
-      isRecalling = false;
-    }, 100);
+    isRecalling = false;
   }, longestDelay);
 }
 
