@@ -343,6 +343,7 @@ class Game {
     const tempBoard = JSON.parse(JSON.stringify(this.board));
     placements.forEach(p => {
       tempBoard[p.row][p.col].letter = p.letter;
+      tempBoard[p.row][p.col].isBlank = p.isBlank || false;
     });
 
     // Check horizontal and vertical word for each placed tile
