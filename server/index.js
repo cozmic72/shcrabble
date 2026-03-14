@@ -73,7 +73,11 @@ app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
 
       try {
         // Check if this game has the player
-        const gameState = JSON.parse(row.game_state);
+        // game_state might already be parsed by mysql2 driver
+        const gameState = typeof row.game_state === 'string'
+          ? JSON.parse(row.game_state)
+          : row.game_state;
+
         const hasPlayer = gameState.players && gameState.players.some(p => p.name === playerName);
 
         if (hasPlayer) {
