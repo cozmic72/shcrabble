@@ -58,7 +58,7 @@ app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
           status: game.status,
           players: game.players.map(p => p.name),
           currentTurn: game.players[game.currentPlayerIndex]?.name,
-          tilesRemaining: game.tileBag.length
+          tilesRemaining: game.tileBag ? game.tileBag.length : 0
         });
       }
     }
