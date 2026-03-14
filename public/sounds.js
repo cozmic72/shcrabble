@@ -44,15 +44,47 @@ function playSequence(notes) {
   });
 }
 
+// Helper to create a subtle percussive click using noise
+function playClick(duration = 0.03, volume = 0.08, filterFreq = 2000) {
+  // Create white noise buffer
+  const bufferSize = audioContext.sampleRate * duration;
+  const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
+  const data = buffer.getChannelData(0);
+
+  // Fill with random noise
+  for (let i = 0; i < bufferSize; i++) {
+    data[i] = (Math.random() * 2 - 1) * 0.3; // Softer noise
+  }
+
+  const noise = audioContext.createBufferSource();
+  noise.buffer = buffer;
+
+  // Filter to make it less harsh
+  const filter = audioContext.createBiquadFilter();
+  filter.type = 'lowpass';
+  filter.frequency.value = filterFreq;
+
+  const gainNode = audioContext.createGain();
+  gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+  gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + duration);
+
+  noise.connect(filter);
+  filter.connect(gainNode);
+  gainNode.connect(audioContext.destination);
+
+  noise.start(audioContext.currentTime);
+  noise.stop(audioContext.currentTime + duration);
+}
+
 const sounds = {
-  // Tile placement - soft click
+  // Tile placement - soft percussive click
   tilePlaced() {
-    playTone(800, 0.05, 'square', 0.1);
+    playClick(0.025, 0.06, 2500); // Very short, quiet, slightly brighter
   },
 
-  // Tile picked up - slightly lower pitch
+  // Tile picked up - softer, lower click
   tilePickup() {
-    playTone(600, 0.05, 'square', 0.08);
+    playClick(0.02, 0.04, 1800); // Even shorter, quieter, duller
   },
 
   // Move submitted - ascending notes
