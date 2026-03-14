@@ -351,9 +351,9 @@ function updateBoard() {
           label.setAttribute('data-bonus', bonus);
           // Always use Shavian for bonus labels
           const bonusLabels = {
-            'TW': '𐑔𐑮𐑦𐑐𐑩𐑤 𐑢𐑻𐑛',
+            'TW': '𐑑𐑮𐑦𐑐𐑩𐑤 𐑢𐑻𐑛',
             'DW': '𐑛𐑳𐑚𐑩𐑤 𐑢𐑻𐑛',
-            'TL': '𐑔𐑮𐑦𐑐𐑩𐑤 𐑤𐑧𐑑𐑼',
+            'TL': '𐑑𐑮𐑦𐑐𐑩𐑤 𐑤𐑧𐑑𐑼',
             'DL': '𐑛𐑳𐑚𐑩𐑤 𐑤𐑧𐑑𐑼'
           };
           label.textContent = bonusLabels[bonus] || bonus;
