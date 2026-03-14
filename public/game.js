@@ -53,7 +53,12 @@ function initSocket() {
   socket = io();
 
   socket.on('connect', () => {
-    console.log('Connected to server');
+    console.log('[SOCKET] Connected to server');
+  });
+
+  // Debug: log all incoming events
+  socket.onAny((eventName, ...args) => {
+    console.log(`[SOCKET-EVENT] ${eventName}:`, ...args);
   });
 
   socket.on('joined', (data) => {
