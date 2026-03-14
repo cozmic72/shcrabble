@@ -217,6 +217,44 @@ class Game {
     return tiles;
   }
 
+  // Exchange tiles from player's rack
+  exchangeTiles(playerIndex, indices) {
+    const player = this.players[playerIndex];
+
+    if (playerIndex !== this.currentPlayerIndex) {
+      throw new Error('Not your turn');
+    }
+
+    if (this.tileBag.length < 7) {
+      throw new Error('Not enough tiles in bag to exchange');
+    }
+
+    if (indices.length === 0) {
+      throw new Error('Must select at least one tile to exchange');
+    }
+
+    // Remove tiles from rack and add to bag
+    const tilesToReturn = [];
+    indices.sort((a, b) => b - a); // Sort descending to avoid index issues
+
+    for (const idx of indices) {
+      if (idx < 0 || idx >= player.rack.length) {
+        throw new Error('Invalid tile index');
+      }
+      tilesToReturn.push(player.rack.splice(idx, 1)[0]);
+    }
+
+    // Add returned tiles to bag and shuffle
+    this.tileBag.push(...tilesToReturn);
+    this.shuffleTileBag();
+
+    // Draw new tiles
+    const newTiles = this.drawTiles(indices.length);
+    player.rack.push(...newTiles);
+
+    return true;
+  }
+
   // Place tiles on board
   placeTiles(playerIndex, placements) {
     // placements: [{row, col, letter, isBlank}]

@@ -294,6 +294,57 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Exchange tiles
+  socket.on('exchange-tiles', async ({ indices }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player || player.index !== game.currentPlayerIndex) {
+        socket.emit('error', { message: 'Not your turn' });
+        return;
+      }
+
+      // Validate enough tiles in bag
+      if (game.tileBag.length < 7) {
+        socket.emit('error', { message: 'Not enough tiles in bag to exchange' });
+        return;
+      }
+
+      // Exchange tiles
+      game.exchangeTiles(player.index, indices);
+
+      // Move to next turn
+      game.nextTurn();
+
+      // Update database
+      await db.query(
+        'UPDATE sessions SET game_state = ?, current_turn = ? WHERE id = ?',
+        [game.serialize(), game.currentPlayerIndex, gameId]
+      );
+
+      // Notify all players with personalized game state
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('game-update', {
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+        });
+      }
+
+      console.log(`Player ${player.name} exchanged ${indices.length} tiles`);
+
+    } catch (err) {
+      console.error('Error exchanging tiles:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
   // Pass turn
   socket.on('pass-turn', async () => {
     try {

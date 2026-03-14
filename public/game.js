@@ -8,6 +8,8 @@ let draggedTile = null;
 let draggedFromRack = false;
 let rackDragSource = null;
 let previousRackSize = 0;
+let exchangeMode = false;
+let tilesToExchange = [];
 
 // Initialize socket connection
 function initSocket() {
@@ -378,10 +380,20 @@ function updateRack() {
     tileDiv.dataset.points = tile.points;
     tileDiv.dataset.isBlank = tile.isBlank;
 
-    // Make tiles draggable
-    tileDiv.draggable = true;
-    tileDiv.addEventListener('dragstart', handleDragStart);
-    tileDiv.addEventListener('dragend', handleDragEnd);
+    // In exchange mode, make tiles clickable to select
+    if (exchangeMode) {
+      tileDiv.style.cursor = 'pointer';
+      if (tilesToExchange.includes(idx)) {
+        tileDiv.style.opacity = '0.5';
+        tileDiv.style.border = '3px solid #667eea';
+      }
+      tileDiv.addEventListener('click', () => toggleTileForExchange(idx));
+    } else {
+      // Make tiles draggable in normal mode
+      tileDiv.draggable = true;
+      tileDiv.addEventListener('dragstart', handleDragStart);
+      tileDiv.addEventListener('dragend', handleDragEnd);
+    }
 
     rackDiv.appendChild(tileDiv);
   });
@@ -702,6 +714,44 @@ function passTurn() {
   }
 }
 
+function exchangeTilesClick() {
+  if (exchangeMode) {
+    // Confirm exchange
+    if (tilesToExchange.length === 0) {
+      showMessage('Select at least one tile to exchange', 'error');
+      return;
+    }
+
+    if (confirm(`Exchange ${tilesToExchange.length} tile(s)? This will end your turn.`)) {
+      socket.emit('exchange-tiles', { indices: tilesToExchange });
+      exchangeMode = false;
+      tilesToExchange = [];
+      document.getElementById('exchange-tiles-btn').textContent = 'Exchange Tiles';
+    }
+  } else {
+    // Enter exchange mode
+    if (gameState.tilesRemaining < 7) {
+      showMessage('Cannot exchange - fewer than 7 tiles remaining in bag', 'error');
+      return;
+    }
+    exchangeMode = true;
+    tilesToExchange = [];
+    updateRack();
+    document.getElementById('exchange-tiles-btn').textContent = 'Confirm Exchange';
+    showMessage('Click tiles to select for exchange, then click Confirm Exchange', 'info');
+  }
+}
+
+function toggleTileForExchange(index) {
+  const idx = tilesToExchange.indexOf(index);
+  if (idx >= 0) {
+    tilesToExchange.splice(idx, 1);
+  } else {
+    tilesToExchange.push(index);
+  }
+  updateRack();
+}
+
 function endGame() {
   if (confirm('End the game now? Final scores will be calculated.')) {
     socket.emit('end-game');
@@ -744,6 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('copy-link-btn').addEventListener('click', copyInviteLink);
   document.getElementById('submit-move-btn').addEventListener('click', submitMove);
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);
+  document.getElementById('exchange-tiles-btn').addEventListener('click', exchangeTilesClick);
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
 
