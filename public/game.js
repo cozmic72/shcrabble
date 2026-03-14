@@ -632,12 +632,13 @@ function validateCurrentMove() {
     if (validationsPending === 0) {
       socket.off('word-validated', validationHandler);
 
+      // Temporarily allow submission even if words are invalid
+      submitBtn.disabled = false;
+
       if (allValid) {
-        submitBtn.disabled = false;
         showMessage('', '');
       } else {
-        submitBtn.disabled = true;
-        showMessage(`Invalid word(s): ${invalidWords.join(', ')}`, 'error');
+        showMessage(`Warning: Invalid word(s): ${invalidWords.join(', ')}`, 'warning');
       }
     }
   };
