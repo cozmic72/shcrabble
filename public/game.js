@@ -88,6 +88,11 @@ function initSocket() {
       showGameScreen();
     }
 
+    // If this was our move (lastMove.playerId matches), clear placements
+    if (data.lastMove && data.lastMove.playerId === playerId) {
+      currentPlacements = [];
+    }
+
     updateGameUI();
 
     if (data.lastMove) {
@@ -100,6 +105,11 @@ function initSocket() {
 
   socket.on('error', (data) => {
     showMessage(data.message, 'error');
+
+    // Re-enable submit button if move was rejected
+    if (currentPlacements.length > 0) {
+      document.getElementById('submit-move-btn').disabled = false;
+    }
   });
 
   socket.on('word-validated', (data) => {
@@ -738,12 +748,14 @@ function submitMove() {
     return;
   }
 
+  // Keep placements until server confirms - don't clear yet
   socket.emit('make-move', {
     placements: currentPlacements
   });
 
-  currentPlacements = [];
-  updateBoard();
+  // Disable submit button while waiting
+  document.getElementById('submit-move-btn').disabled = true;
+  showMessage('Submitting move...', 'info');
 }
 
 function recallTiles() {
