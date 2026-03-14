@@ -82,6 +82,7 @@ function initSocket() {
   });
 
   socket.on('game-update', (data) => {
+    console.log('[GAME-UPDATE]', data);
     gameState = data.gameState;
 
     // Switch to game screen when game becomes active
@@ -91,12 +92,14 @@ function initSocket() {
 
     // If this was our move (lastMove.playerId matches), clear placements
     if (data.lastMove && data.lastMove.playerId === playerId) {
+      console.log('[GAME-UPDATE] Clearing our placements after successful move');
       currentPlacements = [];
     }
 
     updateGameUI();
 
     if (data.lastMove) {
+      console.log(`[GAME-UPDATE] ${data.lastMove.playerName} scored ${data.lastMove.score}`);
       showMessage(i18n.t('msgPlayerScored', {
         name: data.lastMove.playerName,
         score: data.lastMove.score
@@ -166,11 +169,13 @@ function initSocket() {
   });
 
   socket.on('vote-pending', (data) => {
+    console.log('[VOTE-PENDING]', data);
     currentVoteId = data.voteId;
     showMessage(data.message, 'info');
   });
 
   socket.on('vote-request', (data) => {
+    console.log('[VOTE-REQUEST]', data);
     currentVoteId = data.voteId;
     const wordsText = data.invalidWords.join(', ');
     document.getElementById('vote-question').textContent =
@@ -179,6 +184,7 @@ function initSocket() {
   });
 
   socket.on('vote-result', (data) => {
+    console.log('[VOTE-RESULT]', data);
     document.getElementById('vote-dialog').style.display = 'none';
     showMessage(data.message, data.accepted ? 'success' : 'error');
     currentVoteId = null;
@@ -666,6 +672,8 @@ function validateCurrentMove() {
     return;
   }
 
+  console.log('[VALIDATE] Validating current move with placements:', currentPlacements);
+
   // Create temporary board with current placements
   const tempBoard = JSON.parse(JSON.stringify(gameState.board));
   currentPlacements.forEach(p => {
@@ -682,16 +690,16 @@ function validateCurrentMove() {
   for (const p of currentPlacements) {
     // Read horizontal word
     const hWord = readWordFromBoard(tempBoard, p.row, p.col, true);
-    console.log(`Tile at ${p.row},${p.col}: horizontal word = "${hWord}" (${hWord.length} chars)`);
+    console.log(`[VALIDATE] Tile at ${p.row},${p.col}: horizontal word = "${hWord}" (${hWord.length} chars)`);
     if (hWord.length > 1) wordsToCheck.add(hWord);
 
     // Read vertical word
     const vWord = readWordFromBoard(tempBoard, p.row, p.col, false);
-    console.log(`Tile at ${p.row},${p.col}: vertical word = "${vWord}" (${vWord.length} chars)`);
+    console.log(`[VALIDATE] Tile at ${p.row},${p.col}: vertical word = "${vWord}" (${vWord.length} chars)`);
     if (vWord.length > 1) wordsToCheck.add(vWord);
   }
 
-  console.log('Words to check:', Array.from(wordsToCheck));
+  console.log('[VALIDATE] Words to check:', Array.from(wordsToCheck));
 
   if (wordsToCheck.size === 0) {
     submitBtn.disabled = true;
@@ -767,6 +775,8 @@ function submitMove() {
     showMessage(i18n.t('errorNoTilesPlaced'), 'error');
     return;
   }
+
+  console.log('[SUBMIT-MOVE] Submitting placements:', currentPlacements);
 
   // Keep placements until server confirms - don't clear yet
   socket.emit('make-move', {
@@ -894,6 +904,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Vote button handlers
   document.getElementById('vote-accept-btn').addEventListener('click', () => {
     if (currentVoteId) {
+      console.log('[VOTE] Voting ACCEPT for', currentVoteId);
       socket.emit('submit-vote', { voteId: currentVoteId, accept: true });
       document.getElementById('vote-dialog').style.display = 'none';
     }
@@ -901,6 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('vote-reject-btn').addEventListener('click', () => {
     if (currentVoteId) {
+      console.log('[VOTE] Voting REJECT for', currentVoteId);
       socket.emit('submit-vote', { voteId: currentVoteId, accept: false });
       document.getElementById('vote-dialog').style.display = 'none';
     }
