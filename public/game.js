@@ -11,6 +11,25 @@ let previousRackSize = 0;
 let exchangeMode = false;
 let tilesToExchange = [];
 
+// Get or create persistent user ID
+function getUserId() {
+  let userId = localStorage.getItem('shcrabble-userId');
+  if (!userId) {
+    userId = crypto.randomUUID();
+    localStorage.setItem('shcrabble-userId', userId);
+  }
+  return userId;
+}
+
+// Save user preferences
+function saveUserName(name) {
+  localStorage.setItem('shcrabble-userName', name);
+}
+
+function getUserName() {
+  return localStorage.getItem('shcrabble-userName') || '';
+}
+
 // Initialize socket connection
 function initSocket() {
   socket = io();
@@ -534,6 +553,8 @@ function createGame() {
     return;
   }
 
+  saveUserName(name);
+
   fetch('/shcrabble/api/create')
     .then(res => res.json())
     .then(data => {
@@ -544,7 +565,8 @@ function createGame() {
       // Auto-join the game
       socket.emit('join-game', {
         gameId: data.gameId,
-        playerName: name
+        playerName: name,
+        userId: getUserId()
       });
     })
     .catch(err => {
@@ -574,9 +596,12 @@ function joinGame() {
     return;
   }
 
+  saveUserName(name);
+
   socket.emit('join-game', {
     gameId: gameId,
-    playerName: name
+    playerName: name,
+    userId: getUserId()
   });
 }
 
@@ -794,6 +819,13 @@ function showGameEndedDialog(finalScores) {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
+
+  // Prepopulate name fields from localStorage
+  const savedName = getUserName();
+  if (savedName) {
+    document.getElementById('host-name').value = savedName;
+    document.getElementById('join-name').value = savedName;
+  }
 
   // Check if joining via link
   const urlParams = new URLSearchParams(window.location.search);

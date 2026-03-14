@@ -67,7 +67,7 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Join game
-  socket.on('join-game', async ({ gameId, playerName }) => {
+  socket.on('join-game', async ({ gameId, playerName, userId }) => {
     try {
       let game = games.get(gameId);
 
@@ -87,12 +87,14 @@ io.on('connection', (socket) => {
         games.set(gameId, game);
       }
 
+      // Use userId if provided, otherwise generate new ID
+      const playerId = userId || uuidv4();
+
       // Check if this is a reconnection
       const existingPlayer = game.players.find(p => p.name.toLowerCase() === playerName.toLowerCase());
 
       if (existingPlayer) {
         // Reconnect existing player
-        const playerId = uuidv4();
         const player = game.reconnectPlayer(playerId, playerName);
 
         if (!player) {
@@ -100,7 +102,7 @@ io.on('connection', (socket) => {
           return;
         }
 
-        console.log(`Player ${playerName} reconnected with new ID ${playerId}, ownerId is ${game.ownerId}`);
+        console.log(`Player ${playerName} reconnected with ID ${playerId}, ownerId is ${game.ownerId}`);
 
         // Update player ID in database
         await db.query(

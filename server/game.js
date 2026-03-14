@@ -142,8 +142,8 @@ class Game {
     player.id = playerId;
     player.connected = true;
 
-    // If this player was the owner, update ownerId
-    if (this.ownerId === oldId) {
+    // If this player was the owner and ID changed, update ownerId
+    if (this.ownerId === oldId && oldId !== playerId) {
       this.ownerId = playerId;
     }
 
