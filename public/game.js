@@ -189,6 +189,26 @@ function initSocket() {
     showMessage(data.message, data.accepted ? 'success' : 'error');
     currentVoteId = null;
   });
+
+  socket.on('invalid-word-prompt', (data) => {
+    console.log('[INVALID-WORD-PROMPT]', data);
+    const wordsText = data.invalidWords.join(', ');
+    const message = `The following words are not in the dictionary: ${wordsText}\n\nDo you want to put this to a vote with other players?`;
+
+    if (confirm(message)) {
+      console.log('[INVALID-WORD-PROMPT] User confirmed - initiating vote');
+      socket.emit('confirm-vote', {
+        placements: data.placements,
+        invalidWords: data.invalidWords,
+        score: data.score
+      });
+    } else {
+      console.log('[INVALID-WORD-PROMPT] User cancelled - re-enabling submit button');
+      // User cancelled - re-enable submit button so they can recall tiles or try again
+      document.getElementById('submit-move-btn').disabled = false;
+      showMessage('Move cancelled', 'info');
+    }
+  });
 }
 
 // UI Functions

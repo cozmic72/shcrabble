@@ -246,48 +246,25 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Validate - returns array of invalid words
-      const invalidWords = game.placeTiles(player.index, placements);
+      // Validate first WITHOUT placing tiles
+      const invalidWords = game.validatePlacements(placements);
 
       if (invalidWords.length > 0) {
-        // Invalid words found - initiate voting
-        const voteId = uuidv4();
+        // Invalid words found - ask player if they want to put it to a vote
         const score = game.calculateScore(placements);
 
-        pendingVotes.set(voteId, {
-          gameId,
-          playerId,
-          playerName: player.name,
-          placements,
+        socket.emit('invalid-word-prompt', {
           invalidWords,
-          votes: new Map(),
+          placements,
           score
         });
 
-        // Notify player that vote is pending
-        socket.emit('vote-pending', {
-          voteId,
-          invalidWords,
-          message: `Waiting for other players to vote on: ${invalidWords.join(', ')}`
-        });
-
-        // Ask other players to vote
-        const sockets = await io.in(gameId).fetchSockets();
-        for (const s of sockets) {
-          if (s.data.playerId !== playerId && !s.data.isSpectator) {
-            s.emit('vote-request', {
-              voteId,
-              playerName: player.name,
-              invalidWords
-            });
-          }
-        }
-
-        console.log(`Vote ${voteId} initiated for words: ${invalidWords.join(', ')}`);
+        console.log(`Invalid words detected: ${invalidWords.join(', ')}, asking player to confirm vote`);
         return;
       }
 
-      // All words valid - proceed with move
+      // All words valid - place tiles and proceed
+      game.placeTiles(player.index, placements);
       const score = game.calculateScore(placements);
       player.score += score;
 
@@ -320,6 +297,63 @@ io.on('connection', (socket) => {
 
     } catch (err) {
       console.error('Error making move:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  // Player confirms they want to put invalid words to a vote
+  socket.on('confirm-vote', async ({ placements, invalidWords, score }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      const player = game.players.find(p => p.id === playerId);
+      if (!player) {
+        socket.emit('error', { message: 'Player not found' });
+        return;
+      }
+
+      // Initiate voting
+      const voteId = uuidv4();
+
+      pendingVotes.set(voteId, {
+        gameId,
+        playerId,
+        playerName: player.name,
+        placements,
+        invalidWords,
+        votes: new Map(),
+        score
+      });
+
+      // Notify player that vote is pending
+      socket.emit('vote-pending', {
+        voteId,
+        invalidWords,
+        message: `Waiting for other players to vote on: ${invalidWords.join(', ')}`
+      });
+
+      // Ask other players to vote
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        if (s.data.playerId !== playerId && !s.data.isSpectator) {
+          s.emit('vote-request', {
+            voteId,
+            playerName: player.name,
+            invalidWords
+          });
+        }
+      }
+
+      console.log(`Vote ${voteId} initiated for words: ${invalidWords.join(', ')}`);
+
+    } catch (err) {
+      console.error('Error confirming vote:', err);
       socket.emit('error', { message: err.message });
     }
   });

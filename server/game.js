@@ -262,7 +262,7 @@ class Game {
     return true;
   }
 
-  // Place tiles on board
+  // Place tiles on board (assumes validation already done)
   placeTiles(playerIndex, placements) {
     // placements: [{row, col, letter, isBlank}]
     const player = this.players[playerIndex];
@@ -271,9 +271,6 @@ class Game {
     if (playerIndex !== this.currentPlayerIndex) {
       throw new Error('Not your turn');
     }
-
-    // Validate placements
-    this.validatePlacements(placements);
 
     // Apply placements to board
     placements.forEach(p => {
