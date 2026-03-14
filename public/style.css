@@ -989,3 +989,19 @@ body {
   background: #e8f5e9 !important;
   color: #2e7d32;
 }
+
+/* Your turn notification */
+@keyframes turnFlash {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(255, 215, 0, 0.8),
+                0 0 0 16px rgba(255, 215, 0, 0.4);
+  }
+}
+
+#game-screen.your-turn {
+  animation: turnFlash 2s ease-in-out infinite;
+  border-radius: 8px;
+}

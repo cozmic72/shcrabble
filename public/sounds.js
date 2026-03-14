@@ -104,12 +104,13 @@ const sounds = {
     ]);
   },
 
-  // Your turn - pleasant chime
+  // Your turn - attention-getting chime with emphasis
   yourTurn() {
     playSequence([
-      { freq: 523.25, duration: 0.1, volume: 0.25 },  // C
-      { freq: 659.25, duration: 0.1, volume: 0.25 },  // E
-      { freq: 783.99, duration: 0.15, volume: 0.3 }   // G
+      { freq: 659.25, duration: 0.12, volume: 0.35 },  // E
+      { freq: 783.99, duration: 0.12, volume: 0.35 },  // G
+      { freq: 1046.5, duration: 0.18, volume: 0.4 },   // C (high) - louder, longer
+      { freq: 783.99, duration: 0.12, volume: 0.3 }    // G (echo)
     ]);
   },
 

@@ -30,6 +30,21 @@ const SHAVIAN_LETTERS = [
   '𐑹', '𐑺'
 ];
 
+// Turn notification visual flash
+function startTurnNotification() {
+  const gameScreen = document.getElementById('game-screen');
+  if (gameScreen) {
+    gameScreen.classList.add('your-turn');
+  }
+}
+
+function stopTurnNotification() {
+  const gameScreen = document.getElementById('game-screen');
+  if (gameScreen) {
+    gameScreen.classList.remove('your-turn');
+  }
+}
+
 // Save user preferences
 function saveUserName(name) {
   localStorage.setItem('shcrabble-userName', name);
@@ -255,9 +270,13 @@ function initSocket() {
         // It's now our turn - convert ghost placements to real
         handleGhostToRealConversion();
         if (window.sounds) sounds.yourTurn();
+        // Start visual notification
+        startTurnNotification();
       } else {
         // Someone else's turn
         if (window.sounds) sounds.opponentTurn();
+        // Stop visual notification if it was running
+        stopTurnNotification();
       }
     }
 
@@ -1823,6 +1842,13 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[VOTE] Voting REJECT for', currentVoteId);
       socket.emit('submit-vote', { voteId: currentVoteId, accept: false });
       document.getElementById('vote-dialog').style.display = 'none';
+    }
+  });
+
+  // Stop turn notification on any click in game screen
+  document.addEventListener('click', (e) => {
+    if (e.target.closest('#game-screen')) {
+      stopTurnNotification();
     }
   });
 
