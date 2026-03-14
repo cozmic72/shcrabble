@@ -756,6 +756,17 @@ function handleRackDrop(e) {
   } else {
     rack.insertBefore(rackDragSource, afterElement);
   }
+
+  // Update the game state rack array to match the new DOM order
+  const rackTiles = [...rack.querySelectorAll('.rack-tile')];
+  const newRack = rackTiles.map(tileDiv => {
+    const index = parseInt(tileDiv.dataset.index);
+    return gameState.players[playerIndex].rack[index];
+  });
+  gameState.players[playerIndex].rack = newRack;
+
+  // Refresh the rack display to update data-index attributes
+  updateRack();
 }
 
 // Find the element to insert before when reordering
@@ -1529,9 +1540,34 @@ document.addEventListener('DOMContentLoaded', () => {
   if (urlParams.has('game')) {
     const gameId = urlParams.get('game');
     const savedName = getUserName();
+    const userId = getUserId();
 
-    // Always show dialog for role selection
-    showJoinGameDialog();
+    // Check if this might be a reconnection by trying to fetch game state
+    if (savedName && userId) {
+      fetch(`/shcrabble/api/check-player?gameId=${encodeURIComponent(gameId)}&userId=${encodeURIComponent(userId)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.isPlayer) {
+            // User is already in this game, auto-reconnect
+            socket.emit('join-game', {
+              gameId,
+              playerName: savedName,
+              userId,
+              asSpectator: false
+            });
+          } else {
+            // Not in game yet, show dialog for role selection
+            showJoinGameDialog();
+          }
+        })
+        .catch(() => {
+          // On error, show dialog
+          showJoinGameDialog();
+        });
+    } else {
+      // No saved credentials, show dialog
+      showJoinGameDialog();
+    }
   }
 
   // Event listeners for lobby buttons
@@ -1603,6 +1639,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const target = e.target.closest('.square');
     if (!target) return;
+
+    // Check if it's the player's turn before placing on board
+    if (gameState.currentPlayerIndex !== playerIndex) {
+      showMessage(i18n.t('errorNotYourTurn'), 'error');
+      draggedTile = null;
+      draggedFromRack = false;
+      updateRack();
+      return;
+    }
 
     const row = parseInt(target.dataset.row);
     const col = parseInt(target.dataset.col);

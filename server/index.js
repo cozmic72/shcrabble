@@ -184,6 +184,40 @@ app.get('/shcrabble/api/my-games/:userId', async (req, res) => {
   }
 });
 
+// Check if user is already a player in a game
+app.get('/shcrabble/api/check-player', async (req, res) => {
+  try {
+    const { gameId, userId } = req.query;
+
+    if (!gameId || !userId) {
+      return res.status(400).json({ error: 'Missing parameters' });
+    }
+
+    // Check in-memory game first
+    const game = games.get(gameId);
+    if (game) {
+      const isPlayer = game.players.some(p => p.userId === userId || p.name === req.query.playerName);
+      return res.json({ isPlayer });
+    }
+
+    // Check database
+    const rows = await db.query('SELECT game_state FROM sessions WHERE id = ?', [gameId]);
+    if (rows.length === 0) {
+      return res.json({ isPlayer: false });
+    }
+
+    const gameState = typeof rows[0].game_state === 'string'
+      ? JSON.parse(rows[0].game_state)
+      : rows[0].game_state;
+
+    const isPlayer = gameState.players && gameState.players.some(p => p.userId === userId);
+    res.json({ isPlayer });
+  } catch (err) {
+    console.error('Error checking player:', err);
+    res.status(500).json({ error: 'Failed to check player' });
+  }
+});
+
 // Delete multiple games (admin)
 app.post('/shcrabble/api/delete-games', async (req, res) => {
   try {
