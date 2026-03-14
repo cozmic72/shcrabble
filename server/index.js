@@ -522,7 +522,8 @@ io.on('connection', (socket) => {
           lastMove: {
             playerId,
             playerName: player.name,
-            score
+            score,
+            placements
           }
         });
       }
@@ -652,7 +653,8 @@ io.on('connection', (socket) => {
               lastMove: {
                 playerId: vote.playerId,
                 playerName: vote.playerName,
-                score: vote.score
+                score: vote.score,
+                placements: vote.placements
               }
             });
           }

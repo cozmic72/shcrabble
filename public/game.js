@@ -16,6 +16,8 @@ let currentVoteId = null;
 let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
 let pendingBlankPlacement = null; // Stores pending blank tile placement data
 let lastPlacementPosition = null; // Track last tile placement for double-click continuation
+let lastMovePlacements = []; // Track placements from last move for highlighting
+let highlightFadeTimeout = null; // Timeout for fading highlight
 
 // All Shavian letters for blank tile selection
 // First 40 letters in Unicode order (4 rows of 10)
@@ -264,6 +266,11 @@ function initSocket() {
         name: data.lastMove.playerName,
         score: data.lastMove.score
       }), 'success');
+
+      // Highlight the last move placements
+      if (data.lastMove.placements && data.lastMove.playerId !== playerId) {
+        highlightLastMove(data.lastMove.placements);
+      }
     }
   });
 
@@ -587,6 +594,14 @@ function updateBoard() {
         square.classList.remove('occupied');
       }
 
+      // Highlight last move placements
+      const isLastMove = lastMovePlacements.find(p => p.row === row && p.col === col);
+      if (isLastMove) {
+        square.classList.add('last-move-highlight');
+      } else {
+        square.classList.remove('last-move-highlight', 'fading');
+      }
+
       // Highlight current placements
       const placement = currentPlacements.find(p => p.row === row && p.col === col);
       if (placement) {
@@ -623,6 +638,36 @@ function updateBoard() {
       }
     }
   }
+}
+
+function highlightLastMove(placements) {
+  // Clear any existing highlight timeout
+  if (highlightFadeTimeout) {
+    clearTimeout(highlightFadeTimeout);
+    highlightFadeTimeout = null;
+  }
+
+  // Store the placements to highlight
+  lastMovePlacements = placements;
+
+  // Update board to apply highlights
+  updateBoard();
+}
+
+function fadeLastMoveHighlight() {
+  // Add fading class to all highlighted squares
+  const board = document.getElementById('board');
+  const highlightedSquares = board.querySelectorAll('.last-move-highlight');
+
+  highlightedSquares.forEach(square => {
+    square.classList.add('fading');
+  });
+
+  // Clear the placements after animation completes
+  setTimeout(() => {
+    lastMovePlacements = [];
+    updateBoard();
+  }, 1000); // Match the fadeHighlight animation duration
 }
 
 function updateRack() {
@@ -1792,6 +1837,13 @@ document.addEventListener('DOMContentLoaded', () => {
       document.querySelectorAll('#burger-dropdown').forEach(d => {
         d.style.display = 'none';
       });
+    }
+  });
+
+  // Fade last move highlight when window gains focus
+  window.addEventListener('focus', () => {
+    if (lastMovePlacements.length > 0) {
+      fadeLastMoveHighlight();
     }
   });
 

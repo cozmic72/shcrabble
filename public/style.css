@@ -853,6 +853,36 @@ body {
   pointer-events: none;
 }
 
+/* Highlight last move */
+.square.last-move-highlight {
+  box-shadow: 0 0 0 3px #4CAF50, 0 0 15px rgba(76, 175, 80, 0.6);
+  animation: pulseHighlight 2s ease-in-out infinite;
+  z-index: 10;
+  position: relative;
+}
+
+@keyframes pulseHighlight {
+  0%, 100% {
+    box-shadow: 0 0 0 3px #4CAF50, 0 0 15px rgba(76, 175, 80, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 3px #66BB6A, 0 0 20px rgba(76, 175, 80, 0.8);
+  }
+}
+
+.square.last-move-highlight.fading {
+  animation: fadeHighlight 1s ease-out forwards;
+}
+
+@keyframes fadeHighlight {
+  from {
+    box-shadow: 0 0 0 3px #4CAF50, 0 0 15px rgba(76, 175, 80, 0.6);
+  }
+  to {
+    box-shadow: none;
+  }
+}
+
 .rack-tile.rack-gap {
   opacity: 0 !important;
   pointer-events: none;
