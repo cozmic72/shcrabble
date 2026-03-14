@@ -61,6 +61,8 @@ window.becomeOwner = function() {
 }
 
 // Debug function: Add specific tiles to your rack
+// NOTE: This only modifies client-side state for UI testing
+// The server won't have these tiles, so moves will be rejected
 window.addTile = function(letter, isBlank = false) {
   if (!gameState) {
     console.log('Not in a game');
@@ -82,6 +84,7 @@ window.addTile = function(letter, isBlank = false) {
   myPlayer.rack.push(tile);
   updateRack();
   console.log(`Added tile: ${isBlank ? '?' : letter}`);
+  console.log('⚠️  CLIENT-ONLY: Server won\'t recognize this tile');
 }
 
 // Debug function: Add multiple tiles at once
