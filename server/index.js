@@ -16,7 +16,7 @@ const server = http.createServer(app);
 const io = new Server(server);
 
 const PORT = process.env.PORT || 3000;
-const READLEX_PATH = path.join(process.env.HOME, 'Code/shavian-info/readlex/readlex.json');
+const READLEX_PATH = path.join(__dirname, '../data/readlex.json');
 
 // In-memory game storage (could move to DB for persistence)
 const games = new Map();

@@ -30,10 +30,14 @@ mkdir -p "$INSTALL_DIR"
 echo "Copying application files..."
 cp -r server "$INSTALL_DIR/"
 cp -r public "$INSTALL_DIR/"
-cp -r data "$INSTALL_DIR/"
 cp -r database "$INSTALL_DIR/"
 cp package.json "$INSTALL_DIR/"
 cp package-lock.json "$INSTALL_DIR/" 2>/dev/null || true
+
+# Copy dictionary file
+echo "Copying dictionary file..."
+mkdir -p "$INSTALL_DIR/data"
+cp data/readlex/readlex.json "$INSTALL_DIR/data/"
 
 # Install dependencies
 echo "Installing Node.js dependencies..."
