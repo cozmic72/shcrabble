@@ -302,18 +302,33 @@ function updateBoard() {
       const placement = currentPlacements.find(p => p.row === row && p.col === col);
       if (placement) {
         square.classList.add('placement');
+        const tileDiv = document.createElement('div');
+        tileDiv.className = 'tile placed-tile';
+        tileDiv.draggable = true;
+        tileDiv.dataset.row = row;
+        tileDiv.dataset.col = col;
+        tileDiv.dataset.letter = placement.letter;
+        tileDiv.dataset.points = placement.points;
+        tileDiv.dataset.isBlank = placement.isBlank;
+
         const letter = document.createElement('div');
         letter.className = 'tile-letter';
         letter.textContent = placement.letter;
-        square.appendChild(letter);
+        tileDiv.appendChild(letter);
 
         // Add points if not blank
         if (!placement.isBlank && placement.points) {
           const points = document.createElement('span');
           points.className = 'tile-points';
           points.textContent = placement.points;
-          square.appendChild(points);
+          tileDiv.appendChild(points);
         }
+
+        // Add drag handlers
+        tileDiv.addEventListener('dragstart', handlePlacedTileDragStart);
+        tileDiv.addEventListener('dragend', handleDragEnd);
+
+        square.appendChild(tileDiv);
       } else {
         square.classList.remove('placement');
       }
@@ -329,6 +344,10 @@ function updateRack() {
   if (!myPlayer || !myPlayer.rack) return;
 
   myPlayer.rack.forEach((tile, idx) => {
+    // Skip tiles that have been placed on the board
+    const isPlaced = currentPlacements.some(p => p.rackIndex === idx);
+    if (isPlaced) return;
+
     const tileDiv = document.createElement('div');
     tileDiv.className = 'rack-tile';
 
@@ -405,6 +424,23 @@ function handleDragStart(e) {
   };
   draggedFromRack = true;
   rackDragSource = e.target;
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+}
+
+function handlePlacedTileDragStart(e) {
+  const row = parseInt(e.target.dataset.row);
+  const col = parseInt(e.target.dataset.col);
+
+  draggedTile = {
+    letter: e.target.dataset.letter,
+    points: parseInt(e.target.dataset.points),
+    isBlank: e.target.dataset.isBlank === 'true',
+    fromBoard: true,
+    boardRow: row,
+    boardCol: col
+  };
+  draggedFromRack = false;
   e.target.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
 }
@@ -705,8 +741,26 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('drop', (e) => {
-    // Don't handle if this is a rack reorder
+    // Handle drop on rack - remove placement and return to rack
     if (e.target.closest('#rack')) {
+      e.preventDefault();
+      if (!draggedTile) return;
+
+      // If dragging from board, remove that placement
+      if (draggedTile.fromBoard) {
+        const idx = currentPlacements.findIndex(p =>
+          p.row === draggedTile.boardRow && p.col === draggedTile.boardCol
+        );
+        if (idx >= 0) {
+          currentPlacements.splice(idx, 1);
+        }
+      }
+
+      draggedTile = null;
+      draggedFromRack = false;
+      updateBoard();
+      updateGameUI();
+      validateCurrentMove();
       return;
     }
 
@@ -730,13 +784,29 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // Add placement
+    // If dragging from board, remove old placement
+    let rackIndex = null;
+    if (draggedTile.fromBoard) {
+      const idx = currentPlacements.findIndex(p =>
+        p.row === draggedTile.boardRow && p.col === draggedTile.boardCol
+      );
+      if (idx >= 0) {
+        rackIndex = currentPlacements[idx].rackIndex;
+        currentPlacements.splice(idx, 1);
+      }
+    } else {
+      // Dragging from rack
+      rackIndex = draggedTile.rackIndex;
+    }
+
+    // Add new placement
     currentPlacements.push({
       row,
       col,
       letter: draggedTile.letter,
       points: draggedTile.points,
-      isBlank: draggedTile.isBlank
+      isBlank: draggedTile.isBlank,
+      rackIndex: rackIndex
     });
 
     draggedTile = null;
