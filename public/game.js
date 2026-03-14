@@ -244,7 +244,14 @@ function updateBoard() {
           const label = document.createElement('div');
           label.className = 'bonus-label';
           label.setAttribute('data-bonus', bonus);
-          label.textContent = i18n.t(`bonus${bonus}`);
+          // Always use Shavian for bonus labels
+          const bonusLabels = {
+            'TW': '𐑔𐑮𐑦𐑐𐑩𐑤 𐑢𐑻𐑛',
+            'DW': '𐑛𐑳𐑚𐑩𐑤 𐑢𐑻𐑛',
+            'TL': '𐑔𐑮𐑦𐑐𐑩𐑤 𐑤𐑧𐑑𐑼',
+            'DL': '𐑛𐑳𐑚𐑩𐑤 𐑤𐑧𐑑𐑼'
+          };
+          label.textContent = bonusLabels[bonus] || bonus;
           square.appendChild(label);
         }
 
@@ -637,29 +644,43 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // Burger menu handlers
-  document.getElementById('burger-btn').addEventListener('click', () => {
-    const dropdown = document.getElementById('burger-dropdown');
-    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  // Handle both burger menus (lobby and game screen)
+  document.querySelectorAll('#burger-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const menu = e.target.closest('#burger-menu');
+      const dropdown = menu.querySelector('#burger-dropdown');
+      dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+    });
   });
 
   // Close dropdown when clicking outside
   document.addEventListener('click', (e) => {
     if (!e.target.closest('#burger-menu')) {
-      document.getElementById('burger-dropdown').style.display = 'none';
+      document.querySelectorAll('#burger-dropdown').forEach(d => {
+        d.style.display = 'none';
+      });
     }
   });
 
-  // Settings menu
-  document.getElementById('settings-menu-btn').addEventListener('click', () => {
-    document.getElementById('settings-dialog').style.display = 'flex';
-    document.getElementById('burger-dropdown').style.display = 'none';
+  // Settings menu buttons
+  document.querySelectorAll('#settings-menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('settings-dialog').style.display = 'flex';
+      document.querySelectorAll('#burger-dropdown').forEach(d => {
+        d.style.display = 'none';
+      });
+    });
   });
 
-  // About menu
-  document.getElementById('about-menu-btn').addEventListener('click', () => {
-    document.getElementById('about-content').innerHTML = i18n.getAbout();
-    document.getElementById('about-dialog').style.display = 'flex';
-    document.getElementById('burger-dropdown').style.display = 'none';
+  // About menu buttons
+  document.querySelectorAll('#about-menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('about-content').innerHTML = i18n.getAbout();
+      document.getElementById('about-dialog').style.display = 'flex';
+      document.querySelectorAll('#burger-dropdown').forEach(d => {
+        d.style.display = 'none';
+      });
+    });
   });
 
   // Close dialog handlers
