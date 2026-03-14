@@ -620,6 +620,10 @@ io.on('connection', (socket) => {
         if (accepted) {
           // Apply the move
           const player = game.players.find(p => p.id === vote.playerId);
+
+          // Place the tiles on the board
+          game.placeTiles(player.index, vote.placements);
+
           player.score += vote.score;
           game.nextTurn();
 
