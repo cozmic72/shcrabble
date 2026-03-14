@@ -60,6 +60,74 @@ window.becomeOwner = function() {
   }
 }
 
+// Debug function: Add specific tiles to your rack
+window.addTile = function(letter, isBlank = false) {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) {
+    console.log('Player not found');
+    return;
+  }
+
+  const tile = {
+    letter: isBlank ? '' : letter,
+    points: isBlank ? 0 : 1, // Default to 1, you can specify if needed
+    isBlank: isBlank
+  };
+
+  myPlayer.rack.push(tile);
+  updateRack();
+  console.log(`Added tile: ${isBlank ? '?' : letter}`);
+}
+
+// Debug function: Add multiple tiles at once
+window.addTiles = function(letters) {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) {
+    console.log('Player not found');
+    return;
+  }
+
+  const letterArray = typeof letters === 'string' ? [...letters] : letters;
+
+  letterArray.forEach(letter => {
+    if (letter === '?') {
+      addTile('', true);
+    } else {
+      addTile(letter);
+    }
+  });
+
+  console.log(`Added ${letterArray.length} tiles`);
+}
+
+// Debug function: Clear your rack
+window.clearRack = function() {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) {
+    console.log('Player not found');
+    return;
+  }
+
+  myPlayer.rack = [];
+  updateRack();
+  console.log('Rack cleared');
+}
+
 // Initialize socket connection
 function initSocket() {
   socket = io();
