@@ -257,7 +257,8 @@ class Game {
   // Deserialize from database
   static deserialize(gameId, data) {
     const game = new Game(gameId);
-    const state = JSON.parse(data);
+    // MySQL returns JSON columns as objects, not strings
+    const state = typeof data === 'string' ? JSON.parse(data) : data;
     game.board = state.board;
     game.players = state.players;
     game.currentPlayerIndex = state.currentPlayerIndex;
