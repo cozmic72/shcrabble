@@ -39,6 +39,20 @@
     </div>
   </div>
 
+  <!-- Game Ended Dialog -->
+  <div id="game-ended-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2>Game Over</h2>
+        <button class="close-dialog" data-dialog="game-ended-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <h3>Final Scores</h3>
+        <div id="final-scores"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Welcome Dialog -->
   <div id="welcome-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog dialog-large">
@@ -117,6 +131,7 @@
         <div id="game-info">
           <span id="tiles-remaining"><span data-i18n="tilesRemaining">Tiles</span>: 100</span>
           <button id="pass-turn-btn" data-i18n="passTurn">Pass Turn</button>
+          <button id="end-game-btn" style="display: none;">End Game</button>
         </div>
       </div>
 

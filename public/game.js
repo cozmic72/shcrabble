@@ -73,6 +73,47 @@ function initSocket() {
       count: data.playersRemaining
     }), 'error');
   });
+
+  socket.on('player-disconnected', (data) => {
+    showMessage(`${data.playerName} disconnected`, 'info');
+    gameState = data.gameState;
+    updatePlayersList();
+  });
+
+  socket.on('player-reconnected', (data) => {
+    showMessage(`${data.playerName} reconnected`, 'success');
+    gameState = data.gameState;
+    updatePlayersList();
+  });
+
+  socket.on('spectator-joined', (data) => {
+    showMessage(`${data.spectatorName} joined as spectator`, 'info');
+    gameState.spectators = data.spectators;
+    updatePlayersList();
+  });
+
+  socket.on('spectator-left', (data) => {
+    showMessage(`${data.spectatorName} left`, 'info');
+    gameState.spectators = data.spectators;
+    updatePlayersList();
+  });
+
+  socket.on('player-removed', (data) => {
+    showMessage(`${data.playerName} was removed from the game`, 'error');
+    gameState = data.gameState;
+    updatePlayersList();
+    updateBoard();
+  });
+
+  socket.on('removed-from-game', (data) => {
+    alert(data.message);
+    window.location.reload();
+  });
+
+  socket.on('game-ended', (data) => {
+    gameState = data.gameState;
+    showGameEndedDialog(data.finalScores);
+  });
 }
 
 // UI Functions
@@ -111,6 +152,14 @@ function updateGameUI() {
   // Enable/disable submit button
   const submitBtn = document.getElementById('submit-move-btn');
   submitBtn.disabled = currentPlacements.length === 0 || gameState.currentPlayerIndex !== playerIndex;
+
+  // Show/hide end game button for owner
+  const endGameBtn = document.getElementById('end-game-btn');
+  if (gameState.ownerId === playerId && gameState.status !== 'completed') {
+    endGameBtn.style.display = 'inline-block';
+  } else {
+    endGameBtn.style.display = 'none';
+  }
 }
 
 function updatePlayersList() {
@@ -129,16 +178,51 @@ function updatePlayersList() {
       card.classList.add('current-user');
     }
 
+    if (!player.connected) {
+      card.classList.add('disconnected');
+    }
+
     const scoreLabel = i18n.t('score');
     const tilesLabel = i18n.t('tiles');
+    const disconnectedLabel = player.connected ? '' : ' (disconnected)';
+    const isOwner = player.id === gameState.ownerId ? ' 👑' : '';
+    const removeBtn = (gameState.ownerId === playerId && player.id !== playerId)
+      ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
+      : '';
 
     card.innerHTML = `
-      <div class="player-name">${player.name}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}</div>
+      <div class="player-name">${player.name}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${disconnectedLabel}</div>
       <div class="player-score">${scoreLabel}: ${player.score}</div>
       <div class="player-score">${tilesLabel}: ${player.rackCount}</div>
+      ${removeBtn}
     `;
 
     playersList.appendChild(card);
+  });
+
+  // Add spectators section if any
+  if (gameState.spectators && gameState.spectators.length > 0) {
+    const spectatorsHeader = document.createElement('h3');
+    spectatorsHeader.textContent = 'Spectators';
+    spectatorsHeader.style.marginTop = '20px';
+    playersList.appendChild(spectatorsHeader);
+
+    gameState.spectators.forEach(spectator => {
+      const card = document.createElement('div');
+      card.className = 'player-card spectator';
+      card.innerHTML = `<div class="player-name">${spectator.name} 👁</div>`;
+      playersList.appendChild(card);
+    });
+  }
+
+  // Add event listeners for remove buttons
+  document.querySelectorAll('.remove-player-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const targetPlayerId = e.target.dataset.playerId;
+      if (confirm('Remove this player from the game?')) {
+        socket.emit('remove-player', { targetPlayerId });
+      }
+    });
   });
 }
 
@@ -461,6 +545,32 @@ function passTurn() {
   }
 }
 
+function endGame() {
+  if (confirm('End the game now? Final scores will be calculated.')) {
+    socket.emit('end-game');
+  }
+}
+
+function showGameEndedDialog(finalScores) {
+  const dialog = document.getElementById('game-ended-dialog');
+  const scoresDiv = document.getElementById('final-scores');
+
+  scoresDiv.innerHTML = '';
+
+  finalScores.forEach((player, idx) => {
+    const rank = idx + 1;
+    const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '';
+    const scoreEntry = document.createElement('div');
+    scoreEntry.className = 'score-entry';
+    scoreEntry.style.padding = '10px';
+    scoreEntry.style.borderBottom = '1px solid #ddd';
+    scoreEntry.innerHTML = `<strong>${rank}. ${medal} ${player.name}</strong>: ${player.score} points`;
+    scoresDiv.appendChild(scoreEntry);
+  });
+
+  dialog.style.display = 'flex';
+}
+
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
@@ -478,6 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('submit-move-btn').addEventListener('click', submitMove);
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);
   document.getElementById('pass-turn-btn').addEventListener('click', passTurn);
+  document.getElementById('end-game-btn').addEventListener('click', endGame);
 
   // Allow board squares to receive drops
   document.addEventListener('dragover', (e) => {
