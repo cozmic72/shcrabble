@@ -213,6 +213,7 @@ function initSocket() {
     // Preserve local rack order before updating game state
     const myPlayer = gameState?.players?.find(p => p.id === playerId);
     const previousRackOrder = myPlayer?.rack ? [...myPlayer.rack] : null;
+    const previousTurnIndex = gameState?.currentPlayerIndex;
 
     gameState = data.gameState;
 
@@ -246,6 +247,17 @@ function initSocket() {
 
     updateGameUI();
 
+    // Play turn change sound if turn changed
+    if (previousTurnIndex !== undefined && previousTurnIndex !== gameState.currentPlayerIndex) {
+      if (gameState.currentPlayerIndex === playerIndex) {
+        // It's now our turn
+        if (window.sounds) sounds.yourTurn();
+      } else {
+        // Someone else's turn
+        if (window.sounds) sounds.opponentTurn();
+      }
+    }
+
     if (data.lastMove) {
       console.log(`[GAME-UPDATE] ${data.lastMove.playerName} scored ${data.lastMove.score}`);
       showMessage(i18n.t('msgPlayerScored', {
@@ -257,6 +269,9 @@ function initSocket() {
 
   socket.on('error', (data) => {
     showMessage(data.message, 'error');
+
+    // Play error sound
+    if (window.sounds) sounds.error();
 
     // Re-enable submit button if move was rejected
     if (currentPlacements.length > 0) {
@@ -291,6 +306,9 @@ function initSocket() {
     showMessage(i18n.t('spectatorJoined', { name: data.spectatorName }), 'info');
     gameState.spectators = data.spectators;
     updatePlayersList();
+
+    // Play player joined sound
+    if (window.sounds) sounds.playerJoined();
   });
 
   socket.on('spectator-left', (data) => {
@@ -315,6 +333,9 @@ function initSocket() {
     showGameEndedDialog(data.finalScores);
     // Hide game controls since game is over
     hideGameControls();
+
+    // Play game ended sound
+    if (window.sounds) sounds.gameEnded();
   });
 
   socket.on('game-deleted', (data) => {
@@ -335,6 +356,9 @@ function initSocket() {
     document.getElementById('vote-question').textContent =
       `${data.playerName} placed '${wordsText}', but it's not in the dictionary. Will you allow this move?`;
     document.getElementById('vote-dialog').style.display = 'flex';
+
+    // Play vote request sound
+    if (window.sounds) sounds.voteRequest();
   });
 
   socket.on('vote-result', (data) => {
@@ -342,6 +366,15 @@ function initSocket() {
     document.getElementById('vote-dialog').style.display = 'none';
     showMessage(data.message, data.accepted ? 'success' : 'error');
     currentVoteId = null;
+
+    // Play appropriate vote result sound
+    if (window.sounds) {
+      if (data.accepted) {
+        sounds.voteAccepted();
+      } else {
+        sounds.voteRejected();
+      }
+    }
   });
 
   socket.on('invalid-word-prompt', (data) => {
@@ -721,6 +754,9 @@ function handleDragStart(e) {
   rackDragSource = e.target;
   e.target.classList.add('dragging');
   e.dataTransfer.effectAllowed = 'move';
+
+  // Play pickup sound
+  if (window.sounds) sounds.tilePickup();
 }
 
 function handlePlacedTileDragStart(e) {
@@ -951,6 +987,9 @@ function selectBlankLetter(letter) {
   });
 
   console.log('[BLANK] Current placements:', currentPlacements);
+
+  // Play placement sound
+  if (window.sounds) sounds.tilePlaced();
 
   // Clean up
   document.getElementById('blank-letter-dialog').style.display = 'none';
@@ -1210,6 +1249,9 @@ function submitMove() {
     placements: currentPlacements
   });
 
+  // Play submit sound
+  if (window.sounds) sounds.moveSubmitted();
+
   // Disable submit button while waiting
   document.getElementById('submit-move-btn').disabled = true;
   showMessage(i18n.t('submittingMove'), 'info');
@@ -1217,6 +1259,9 @@ function submitMove() {
 
 function recallTiles() {
   if (currentPlacements.length === 0) return;
+
+  // Play recall sound
+  if (window.sounds) sounds.tilesRecalled();
 
   // Set flag to prevent slide-in animation
   isRecalling = true;
@@ -1720,6 +1765,9 @@ document.addEventListener('DOMContentLoaded', () => {
       isBlank: false,
       rackIndex: rackIndex
     });
+
+    // Play placement sound
+    if (window.sounds) sounds.tilePlaced();
 
     draggedTile = null;
     draggedFromRack = false;
