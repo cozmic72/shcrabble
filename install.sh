@@ -22,6 +22,10 @@ if ! command -v node &> /dev/null; then
   exit 1
 fi
 
+# Initialize git submodules
+echo "Initializing git submodules..."
+git submodule update --init --recursive
+
 # Create installation directory
 echo "Creating installation directory..."
 mkdir -p "$INSTALL_DIR"
