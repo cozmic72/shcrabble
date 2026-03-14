@@ -374,16 +374,44 @@ function initSocket() {
   socket.on('vote-pending', (data) => {
     console.log('[VOTE-PENDING]', data);
     currentVoteId = data.voteId;
-    showMessage(data.message, 'info');
+
+    // Show progress dialog instead of just a message
+    document.getElementById('vote-progress-message').textContent =
+      `Waiting for votes on: ${data.invalidWords.join(', ')}`;
+    document.getElementById('vote-count-current').textContent = '0';
+    document.getElementById('vote-count-total').textContent = data.totalVoters;
+    document.getElementById('vote-accept-count').textContent = '0';
+    document.getElementById('vote-reject-count').textContent = '0';
+    document.getElementById('vote-progress-dialog').style.display = 'flex';
+  });
+
+  socket.on('vote-progress', (data) => {
+    console.log('[VOTE-PROGRESS]', data);
+
+    // Update progress dialog with vote counts
+    document.getElementById('vote-count-current').textContent = data.votesReceived;
+    document.getElementById('vote-count-total').textContent = data.totalVoters;
+    document.getElementById('vote-accept-count').textContent = data.acceptVotes;
+    document.getElementById('vote-reject-count').textContent = data.rejectVotes;
   });
 
   socket.on('vote-request', (data) => {
     console.log('[VOTE-REQUEST]', data);
     currentVoteId = data.voteId;
     const wordsText = data.invalidWords.join(', ');
+
+    // Show vote dialog
     document.getElementById('vote-question').textContent =
       `${data.playerName} placed '${wordsText}', but it's not in the dictionary. Will you allow this move?`;
     document.getElementById('vote-dialog').style.display = 'flex';
+
+    // Also show progress dialog in background (will be visible after voting)
+    document.getElementById('vote-progress-message').textContent =
+      `Voting on: ${wordsText}`;
+    document.getElementById('vote-count-current').textContent = '0';
+    document.getElementById('vote-count-total').textContent = '?'; // Will be updated
+    document.getElementById('vote-accept-count').textContent = '0';
+    document.getElementById('vote-reject-count').textContent = '0';
 
     // Play vote request sound
     if (window.sounds) sounds.voteRequest();
@@ -392,10 +420,11 @@ function initSocket() {
   socket.on('vote-result', (data) => {
     console.log('[VOTE-RESULT]', data);
     document.getElementById('vote-dialog').style.display = 'none';
-    showMessage(data.message, data.accepted ? 'success' : 'error');
+    document.getElementById('vote-progress-dialog').style.display = 'none';
+    showMessage(data.message, data.accepted ? 'success' : (data.cancelled ? 'info' : 'error'));
     currentVoteId = null;
 
-    // If vote was rejected, clear current placements and re-enable submit button
+    // If vote was rejected or cancelled, clear current placements and re-enable submit button
     // so player can recall tiles or modify their move
     if (!data.accepted && currentPlacements.length > 0) {
       // Don't clear placements - let player recall or modify them
@@ -406,7 +435,7 @@ function initSocket() {
     if (window.sounds) {
       if (data.accepted) {
         sounds.voteAccepted();
-      } else {
+      } else if (!data.cancelled) {
         sounds.voteRejected();
       }
     }
@@ -1895,6 +1924,8 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[VOTE] Voting ACCEPT for', currentVoteId);
       socket.emit('submit-vote', { voteId: currentVoteId, accept: true });
       document.getElementById('vote-dialog').style.display = 'none';
+      // Show progress dialog after voting
+      document.getElementById('vote-progress-dialog').style.display = 'flex';
     }
   });
 
@@ -1903,6 +1934,17 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[VOTE] Voting REJECT for', currentVoteId);
       socket.emit('submit-vote', { voteId: currentVoteId, accept: false });
       document.getElementById('vote-dialog').style.display = 'none';
+      // Show progress dialog after voting
+      document.getElementById('vote-progress-dialog').style.display = 'flex';
+    }
+  });
+
+  document.getElementById('cancel-vote-btn').addEventListener('click', () => {
+    if (currentVoteId) {
+      console.log('[VOTE] Cancelling vote', currentVoteId);
+      socket.emit('cancel-vote', { voteId: currentVoteId });
+      document.getElementById('vote-progress-dialog').style.display = 'none';
+      currentVoteId = null;
     }
   });
 
@@ -2082,9 +2124,13 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // Close dialogs on overlay click
+  // Close dialogs on overlay click (except voting dialogs which are modal)
   document.querySelectorAll('.dialog-overlay').forEach(overlay => {
     overlay.addEventListener('click', (e) => {
+      // Don't allow closing voting dialogs by clicking outside - they are modal
+      if (overlay.id === 'vote-dialog' || overlay.id === 'vote-progress-dialog') {
+        return;
+      }
       if (e.target === overlay) {
         overlay.style.display = 'none';
       }

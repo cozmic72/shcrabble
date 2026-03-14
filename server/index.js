@@ -598,10 +598,15 @@ io.on('connection', (socket) => {
         score
       });
 
+      const game = games.get(gameId);
+      const otherPlayers = game.players.filter(p => p.id !== playerId);
+      const totalVoters = otherPlayers.length + game.spectators.length;
+
       // Notify player that vote is pending
       socket.emit('vote-pending', {
         voteId,
         invalidWords,
+        totalVoters,
         message: `Waiting for other players to vote on: ${invalidWords.join(', ')}`
       });
 
@@ -618,7 +623,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      console.log(`Vote ${voteId} initiated for words: ${invalidWords.join(', ')}`);
+      console.log(`Vote ${voteId} initiated for words: ${invalidWords.join(', ')}, ${totalVoters} voters`);
 
     } catch (err) {
       console.error('Error confirming vote:', err);
@@ -645,13 +650,32 @@ io.on('connection', (socket) => {
 
       // Count total eligible voters (other players + spectators)
       const totalVoters = otherPlayers.length + game.spectators.length;
-      const allVoted = vote.votes.size >= totalVoters;
+      const votesReceived = vote.votes.size;
+      const acceptVotes = Array.from(vote.votes.values()).filter(v => v).length;
+      const rejectVotes = votesReceived - acceptVotes;
 
-      console.log(`Vote received: ${accept ? 'accept' : 'reject'} from ${playerId}, ${vote.votes.size}/${totalVoters} votes`);
+      console.log(`Vote received: ${accept ? 'accept' : 'reject'} from ${playerId}, ${votesReceived}/${totalVoters} votes (${acceptVotes} accept, ${rejectVotes} reject)`);
 
-      if (allVoted) {
+      // Send progress update to everyone in the game
+      const allSockets = await io.in(gameId).fetchSockets();
+      for (const s of allSockets) {
+        s.emit('vote-progress', {
+          voteId: vote.voteId,
+          votesReceived,
+          totalVoters,
+          acceptVotes,
+          rejectVotes
+        });
+      }
+
+      // Check if we have a majority decision (early termination)
+      const majorityNeeded = Math.floor(totalVoters / 2) + 1;
+      const hasAcceptMajority = acceptVotes >= majorityNeeded;
+      const hasRejectMajority = rejectVotes >= majorityNeeded;
+      const allVoted = votesReceived >= totalVoters;
+
+      if (allVoted || hasAcceptMajority || hasRejectMajority) {
         // Tally votes - accept if majority voted yes (>50%)
-        const acceptVotes = Array.from(vote.votes.values()).filter(v => v).length;
         const accepted = acceptVotes > (totalVoters / 2);
 
         console.log(`Vote complete: ${acceptVotes} accept votes, ${accepted ? 'ACCEPTED' : 'REJECTED'}`);
@@ -723,6 +747,50 @@ io.on('connection', (socket) => {
 
     } catch (err) {
       console.error('Error processing vote:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  // Cancel vote
+  socket.on('cancel-vote', async ({ voteId }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const vote = pendingVotes.get(voteId);
+
+      if (!vote || vote.gameId !== gameId) {
+        socket.emit('error', { message: 'Vote not found' });
+        return;
+      }
+
+      // Only the player who initiated the vote can cancel it
+      if (vote.playerId !== playerId) {
+        socket.emit('error', { message: 'Only the player who submitted can cancel the vote' });
+        return;
+      }
+
+      console.log(`Vote ${voteId} cancelled by ${playerId}`);
+
+      // Notify all players that vote was cancelled
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('vote-result', {
+          voteId,
+          accepted: false,
+          cancelled: true,
+          message: `Vote cancelled by player`
+        });
+
+        // Send updated game state
+        const game = games.get(gameId);
+        s.emit('game-update', {
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+        });
+      }
+
+      pendingVotes.delete(voteId);
+
+    } catch (err) {
+      console.error('Error cancelling vote:', err);
       socket.emit('error', { message: err.message });
     }
   });
