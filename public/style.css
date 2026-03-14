@@ -716,6 +716,18 @@ body {
               inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* Ghost placement - tiles placed while waiting for turn */
+.square.ghost-placement {
+  background: linear-gradient(135deg, rgba(179, 245, 179, 0.3) 0%, rgba(152, 251, 152, 0.3) 50%, rgba(126, 230, 126, 0.3) 100%) !important;
+  border: 2px dashed #52b152 !important;
+  border-radius: 3px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.square.ghost-placement .placed-tile {
+  opacity: 0.5;
+}
+
 .bonus-label {
   position: absolute;
   font-size: 0.5em;

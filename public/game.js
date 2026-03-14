@@ -252,7 +252,8 @@ function initSocket() {
     // Play turn change sound if turn changed
     if (previousTurnIndex !== undefined && previousTurnIndex !== gameState.currentPlayerIndex) {
       if (gameState.currentPlayerIndex === playerIndex) {
-        // It's now our turn
+        // It's now our turn - convert ghost placements to real
+        handleGhostToRealConversion();
         if (window.sounds) sounds.yourTurn();
       } else {
         // Someone else's turn
@@ -612,7 +613,14 @@ function updateBoard() {
       // Highlight current placements
       const placement = currentPlacements.find(p => p.row === row && p.col === col);
       if (placement) {
-        square.classList.add('placement');
+        // Use ghost-placement class if it's a ghost tile, otherwise placement
+        if (placement.isGhost) {
+          square.classList.add('ghost-placement');
+          square.classList.remove('placement');
+        } else {
+          square.classList.add('placement');
+          square.classList.remove('ghost-placement');
+        }
         const tileDiv = document.createElement('div');
         tileDiv.className = 'tile placed-tile';
         tileDiv.draggable = true;
@@ -641,10 +649,47 @@ function updateBoard() {
 
         square.appendChild(tileDiv);
       } else {
-        square.classList.remove('placement');
+        square.classList.remove('placement', 'ghost-placement');
       }
     }
   }
+}
+
+function handleGhostToRealConversion() {
+  // Check if any ghost placements conflict with the current board state
+  const conflicts = [];
+  const validPlacements = [];
+
+  currentPlacements.forEach(placement => {
+    if (placement.isGhost) {
+      // Check if this square is now occupied on the board
+      if (gameState.board[placement.row][placement.col].letter) {
+        conflicts.push(placement);
+      } else {
+        // No conflict - convert to real placement
+        placement.isGhost = false;
+        validPlacements.push(placement);
+      }
+    } else {
+      validPlacements.push(placement);
+    }
+  });
+
+  // If there were conflicts, recall ALL ghost tiles and notify user
+  if (conflicts.length > 0) {
+    console.log('[GHOST] Conflicts detected, recalling ghost tiles:', conflicts);
+    currentPlacements = currentPlacements.filter(p => !p.isGhost);
+    showMessage(`Ghost tiles recalled due to conflicts`, 'info');
+    if (window.sounds) sounds.tilesRecalled();
+  } else if (validPlacements.some(p => !p.isGhost && currentPlacements.some(cp => cp.isGhost))) {
+    // Some ghost tiles were converted successfully
+    console.log('[GHOST] Ghost tiles converted to real placements');
+    showMessage(`Ghost tiles are now active!`, 'success');
+  }
+
+  updateBoard();
+  updateGameUI();
+  validateCurrentMove();
 }
 
 function highlightLastMove(placements) {
@@ -1024,7 +1069,7 @@ function showBlankLetterDialog() {
 function selectBlankLetter(letter) {
   if (!pendingBlankPlacement) return;
 
-  const { row, col, draggedTile, rackIndex } = pendingBlankPlacement;
+  const { row, col, draggedTile, rackIndex, isGhost } = pendingBlankPlacement;
 
   console.log('[BLANK] Selected letter:', letter, 'for position:', row, col);
 
@@ -1035,7 +1080,8 @@ function selectBlankLetter(letter) {
     letter: letter,
     points: 0, // Blank tiles are worth 0 points
     isBlank: true,
-    rackIndex: rackIndex
+    rackIndex: rackIndex,
+    isGhost: isGhost || false
   });
 
   console.log('[BLANK] Current placements:', currentPlacements);
@@ -1185,16 +1231,19 @@ function validateCurrentMove() {
   const submitBtn = document.getElementById('submit-move-btn');
   const messageArea = document.getElementById('message-area');
 
-  if (currentPlacements.length === 0) {
+  // Check if we have any real (non-ghost) placements
+  const realPlacements = currentPlacements.filter(p => !p.isGhost);
+
+  if (realPlacements.length === 0) {
     submitBtn.disabled = true;
     return;
   }
 
-  console.log('[VALIDATE] Validating current move with placements:', currentPlacements);
+  console.log('[VALIDATE] Validating current move with placements:', realPlacements);
 
-  // Create temporary board with current placements
+  // Create temporary board with current placements (only real ones)
   const tempBoard = JSON.parse(JSON.stringify(gameState.board));
-  currentPlacements.forEach(p => {
+  realPlacements.forEach(p => {
     tempBoard[p.row][p.col] = {
       letter: p.letter,
       points: p.points,
@@ -1202,10 +1251,10 @@ function validateCurrentMove() {
     };
   });
 
-  // Read horizontal and vertical word for each placed tile
+  // Read horizontal and vertical word for each placed tile (only real placements)
   const wordsToCheck = new Set();
 
-  for (const p of currentPlacements) {
+  for (const p of realPlacements) {
     // Read horizontal word
     const hWord = readWordFromBoard(tempBoard, p.row, p.col, true);
     console.log(`[VALIDATE] Tile at ${p.row},${p.col}: horizontal word = "${hWord}" (${hWord.length} chars)`);
@@ -1289,16 +1338,19 @@ function readWordFromBoard(board, row, col, horizontal) {
 }
 
 function submitMove() {
-  if (currentPlacements.length === 0) {
+  // Only submit real (non-ghost) placements
+  const realPlacements = currentPlacements.filter(p => !p.isGhost);
+
+  if (realPlacements.length === 0) {
     showMessage(i18n.t('errorNoTilesPlaced'), 'error');
     return;
   }
 
-  console.log('[SUBMIT-MOVE] Submitting placements:', currentPlacements);
+  console.log('[SUBMIT-MOVE] Submitting placements:', realPlacements);
 
   // Keep placements until server confirms - don't clear yet
   socket.emit('make-move', {
-    placements: currentPlacements
+    placements: realPlacements
   });
 
   // Play submit sound
@@ -1759,17 +1811,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const target = e.target.closest('.square');
     if (!target) return;
 
-    // Check if it's the player's turn before placing on board
-    if (gameState.currentPlayerIndex !== playerIndex) {
-      showMessage(i18n.t('errorNotYourTurn'), 'error');
-      draggedTile = null;
-      draggedFromRack = false;
-      updateRack();
-      return;
-    }
-
     const row = parseInt(target.dataset.row);
     const col = parseInt(target.dataset.col);
+
+    // Determine if this is a ghost placement (not our turn)
+    const isGhostPlacement = gameState.currentPlayerIndex !== playerIndex;
 
     if (gameState.board[row][col].letter) {
       showMessage(i18n.t('errorSquareOccupied'), 'error');
@@ -1802,7 +1848,8 @@ document.addEventListener('DOMContentLoaded', () => {
         row,
         col,
         draggedTile,
-        rackIndex
+        rackIndex,
+        isGhost: isGhostPlacement
       };
       showBlankLetterDialog();
       return;
@@ -1815,7 +1862,8 @@ document.addEventListener('DOMContentLoaded', () => {
       letter: draggedTile.letter,
       points: draggedTile.points,
       isBlank: false,
-      rackIndex: rackIndex
+      rackIndex: rackIndex,
+      isGhost: isGhostPlacement
     });
 
     // Play placement sound
