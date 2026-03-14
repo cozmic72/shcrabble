@@ -86,7 +86,7 @@ cp package-lock.json "$INSTALL_DIR/" 2>/dev/null || true
 # Copy dictionary file
 echo "Copying dictionary file..."
 mkdir -p "$INSTALL_DIR/data/readlex"
-cp data/readlex/readlex.json "$INSTALL_DIR/data/readlex/"
+cp -r data/readlex "$INSTALL_DIR/data/"
 
 # Install dependencies
 echo "Installing Node.js dependencies..."
