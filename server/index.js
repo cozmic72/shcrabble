@@ -29,6 +29,9 @@ const dictionary = new Dictionary();
 // Serve static files from public directory
 app.use('/shcrabble', express.static(path.join(__dirname, '../public')));
 
+// Serve Socket.IO client library
+app.use('/shcrabble/socket.io', express.static(path.join(__dirname, '../node_modules/socket.io/client-dist')));
+
 // API endpoints
 app.get('/shcrabble/api/health', (req, res) => {
   res.json({ status: 'ok', games: games.size });
