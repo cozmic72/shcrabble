@@ -15,13 +15,14 @@ let pendingGameCreatedDialog = false; // Flag to show game-created dialog after 
 let pendingBlankPlacement = null; // Stores pending blank tile placement data
 
 // All Shavian letters for blank tile selection
+// First 40 letters in Unicode order (4 rows of 10)
 const SHAVIAN_LETTERS = [
-  '𐑐', '𐑑', '𐑒', '𐑓', '𐑔', '𐑕', '𐑖',
-  '𐑗', '𐑘', '𐑙', '𐑚', '𐑛', '𐑜', '𐑝',
-  '𐑟', '𐑠', '𐑡', '𐑢', '𐑣', '𐑤', '𐑥',
-  '𐑦', '𐑧', '𐑨', '𐑩', '𐑪', '𐑫', '𐑬',
-  '𐑭', '𐑮', '𐑯', '𐑰', '𐑱', '𐑲', '𐑳',
-  '𐑴', '𐑵', '𐑶', '𐑷', '𐑺', '𐑻'
+  '𐑐', '𐑑', '𐑒', '𐑓', '𐑔', '𐑕', '𐑖', '𐑗', '𐑘', '𐑙',
+  '𐑚', '𐑛', '𐑜', '𐑝', '𐑟', '𐑠', '𐑡', '𐑢', '𐑣', '𐑤',
+  '𐑥', '𐑦', '𐑧', '𐑨', '𐑩', '𐑪', '𐑫', '𐑬', '𐑭', '𐑮',
+  '𐑯', '𐑰', '𐑱', '𐑲', '𐑳', '𐑴', '𐑵', '𐑶', '𐑷', '𐑸',
+  // Compounds on separate row
+  '𐑹', '𐑺'
 ];
 
 // Save user preferences
