@@ -39,6 +39,21 @@
     </div>
   </div>
 
+  <!-- My Games Dialog -->
+  <div id="my-games-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 data-i18n="myGames">My Games</h2>
+        <button class="close-dialog" data-dialog="my-games-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <div id="my-games-list">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Game Ended Dialog -->
   <div id="game-ended-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog">
@@ -178,6 +193,7 @@
       <div id="burger-menu">
         <button id="burger-btn" aria-label="Menu">☰</button>
         <div id="burger-dropdown" class="dropdown" style="display: none;">
+          <button class="menu-item" id="my-games-menu-btn" data-i18n="myGames">My Games</button>
           <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
           <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
         </div>
@@ -199,6 +215,7 @@
       <div id="burger-menu">
         <button id="burger-btn" aria-label="Menu">☰</button>
         <div id="burger-dropdown" class="dropdown" style="display: none;">
+          <button class="menu-item" id="my-games-menu-btn" data-i18n="myGames">My Games</button>
           <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
           <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
         </div>

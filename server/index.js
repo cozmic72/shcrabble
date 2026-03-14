@@ -43,6 +43,33 @@ app.get('/shcrabble/api/health', (req, res) => {
   res.json({ status: 'ok', games: games.size });
 });
 
+// Get user's games
+app.get('/shcrabble/api/my-games/:playerName', async (req, res) => {
+  try {
+    const playerName = decodeURIComponent(req.params.playerName);
+
+    // Get all active games from memory
+    const myGames = [];
+    for (const [gameId, game] of games.entries()) {
+      const player = game.players.find(p => p.name === playerName);
+      if (player) {
+        myGames.push({
+          id: gameId,
+          status: game.status,
+          players: game.players.map(p => p.name),
+          currentTurn: game.players[game.currentPlayerIndex]?.name,
+          tilesRemaining: game.tilesRemaining
+        });
+      }
+    }
+
+    res.json({ games: myGames });
+  } catch (err) {
+    console.error('Error fetching my games:', err);
+    res.status(500).json({ error: 'Failed to fetch games' });
+  }
+});
+
 // Create new game
 app.post('/shcrabble/api/create', async (req, res) => {
   try {

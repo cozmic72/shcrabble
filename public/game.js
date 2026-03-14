@@ -1296,6 +1296,62 @@ function hideGameControls() {
   }
 }
 
+async function showMyGamesDialog() {
+  const playerName = getUserName();
+  if (!playerName) {
+    alert(i18n.t('enterYourName'));
+    return;
+  }
+
+  const gamesList = document.getElementById('my-games-list');
+  gamesList.innerHTML = '<p>Loading...</p>';
+  document.getElementById('my-games-dialog').style.display = 'flex';
+
+  try {
+    const response = await fetch(`/shcrabble/api/my-games/${encodeURIComponent(playerName)}`);
+    const data = await response.json();
+
+    if (data.games.length === 0) {
+      gamesList.innerHTML = '<p>No active games found.</p>';
+      return;
+    }
+
+    gamesList.innerHTML = '';
+    data.games.forEach(game => {
+      const gameDiv = document.createElement('div');
+      gameDiv.className = 'game-item';
+      gameDiv.style.padding = '15px';
+      gameDiv.style.borderBottom = '1px solid #ddd';
+      gameDiv.style.cursor = 'pointer';
+
+      const statusColor = game.status === 'active' ? '#4caf50' : '#ff9800';
+      const isYourTurn = game.currentTurn === playerName;
+      const turnIndicator = isYourTurn ? ' 🟢 Your turn!' : '';
+
+      gameDiv.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 5px;">
+          <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...
+        </div>
+        <div style="font-size: 0.9em; color: #666;">
+          Players: ${game.players.join(', ')}
+        </div>
+        <div style="font-size: 0.9em; color: #666;">
+          Tiles remaining: ${game.tilesRemaining}${turnIndicator}
+        </div>
+      `;
+
+      gameDiv.addEventListener('click', () => {
+        window.location.href = `/shcrabble/?game=${game.id}`;
+      });
+
+      gamesList.appendChild(gameDiv);
+    });
+  } catch (err) {
+    console.error('Error loading games:', err);
+    gamesList.innerHTML = '<p>Error loading games. Please try again.</p>';
+  }
+}
+
 function showGameEndedDialog(finalScores) {
   const dialog = document.getElementById('game-ended-dialog');
   const scoresDiv = document.getElementById('final-scores');
@@ -1475,6 +1531,16 @@ document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('#settings-menu-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.getElementById('settings-dialog').style.display = 'flex';
+      document.querySelectorAll('#burger-dropdown').forEach(d => {
+        d.style.display = 'none';
+      });
+    });
+  });
+
+  // My Games menu buttons
+  document.querySelectorAll('#my-games-menu-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await showMyGamesDialog();
       document.querySelectorAll('#burger-dropdown').forEach(d => {
         d.style.display = 'none';
       });
