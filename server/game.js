@@ -36,14 +36,13 @@ class Game {
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
   }
 
-  // Load tiles from CSV
-  loadTiles() {
+  // Load tile definitions and metadata from CSV (without initializing tileBag)
+  loadTileInfo() {
     const tilesPath = path.join(__dirname, '../data/tiles.csv');
     const content = fs.readFileSync(tilesPath, 'utf8');
     const lines = content.trim().split('\n').slice(1); // Skip header
 
     this.tiles = [];
-    this.tileBag = [];
     this.allLetters = []; // Store all possible letters for wildcard validation
 
     lines.forEach(line => {
@@ -51,7 +50,8 @@ class Game {
       const tileInfo = {
         letter: letter === 'blank' ? '' : letter,
         points: parseInt(points),
-        isBlank: letter === 'blank'
+        isBlank: letter === 'blank',
+        count: parseInt(count)
       };
 
       this.tiles.push(tileInfo);
@@ -60,10 +60,23 @@ class Game {
       if (letter !== 'blank') {
         this.allLetters.push(letter);
       }
+    });
+  }
 
+  // Load tiles from CSV
+  loadTiles() {
+    this.loadTileInfo();
+
+    this.tileBag = [];
+
+    this.tiles.forEach(tileInfo => {
       // Add tiles to bag
-      for (let i = 0; i < parseInt(count); i++) {
-        this.tileBag.push({ ...tileInfo });
+      for (let i = 0; i < tileInfo.count; i++) {
+        this.tileBag.push({
+          letter: tileInfo.letter,
+          points: tileInfo.points,
+          isBlank: tileInfo.isBlank
+        });
       }
     });
 
@@ -617,7 +630,7 @@ class Game {
     game.locked = state.locked || false;
     game.turnsTaken = state.turnsTaken || 0;
     game.ownerId = state.ownerId || null;
-    game.loadTiles(); // Load tile info
+    game.loadTileInfo(); // Load tile definitions only (preserves tileBag)
     return game;
   }
 }
