@@ -215,7 +215,6 @@
       <div id="burger-menu">
         <button id="burger-btn" aria-label="Menu">☰</button>
         <div id="burger-dropdown" class="dropdown" style="display: none;">
-          <button class="menu-item" id="main-menu-btn" data-i18n="mainMenu">Main Menu</button>
           <button class="menu-item" id="my-games-menu-btn" data-i18n="myGames">My Games</button>
           <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
           <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
@@ -224,10 +223,11 @@
 
       <div id="game-header">
         <h1 data-i18n="appTitle">𐑖𐑒𐑮𐑨𐑚𐑩𐑤 Shcrabble</h1>
+        <span id="tiles-remaining"><span data-i18n="tilesRemaining">Tiles</span>: 100</span>
         <div id="game-info">
-          <span id="tiles-remaining"><span data-i18n="tilesRemaining">Tiles</span>: 100</span>
-          <button id="leave-game-btn">Leave Game</button>
-          <button id="end-game-btn" style="display: none;">End Game</button>
+          <button id="main-menu-game-btn" data-i18n="mainMenu">Main Menu</button>
+          <button id="leave-game-btn" data-i18n="leaveGame">Leave Game</button>
+          <button id="end-game-btn" style="display: none;" data-i18n="endGame">End Game</button>
         </div>
       </div>
 
