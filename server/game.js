@@ -136,9 +136,16 @@ class Game {
       return null;
     }
 
+    const oldId = player.id;
+
     // Update player ID and mark as connected
     player.id = playerId;
     player.connected = true;
+
+    // If this player was the owner, update ownerId
+    if (this.ownerId === oldId) {
+      this.ownerId = playerId;
+    }
 
     return player;
   }

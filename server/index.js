@@ -100,6 +100,8 @@ io.on('connection', (socket) => {
           return;
         }
 
+        console.log(`Player ${playerName} reconnected with new ID ${playerId}, ownerId is ${game.ownerId}`);
+
         // Update player ID in database
         await db.query(
           'UPDATE players SET id = ? WHERE session_id = ? AND player_name = ?',
