@@ -19,7 +19,7 @@ const BONUS_SQUARES = {
 };
 
 class Game {
-  constructor(gameId) {
+  constructor(gameId, dictionary = null) {
     this.gameId = gameId;
     this.board = this.createEmptyBoard();
     this.players = [];
@@ -31,6 +31,7 @@ class Game {
     this.locked = false; // true after first turn is taken
     this.turnsTaken = 0;
     this.ownerId = null; // Player ID of game creator
+    this.dictionary = dictionary; // Reference to dictionary for word validation
   }
 
   // Load tiles from CSV
@@ -280,12 +281,129 @@ class Game {
       throw new Error('All tiles must be placed in a straight line');
     }
 
-    // More validation to add:
-    // - First move must cover center square
-    // - Subsequent moves must connect to existing tiles
-    // - Words formed must be valid
+    // First move must cover center square
+    if (this.turnsTaken === 0) {
+      const coversCenter = placements.some(p => p.row === 7 && p.col === 7);
+      if (!coversCenter) {
+        throw new Error('First move must cover the center square');
+      }
+    }
+
+    // Validate all words formed
+    const words = this.getFormedWords(placements);
+    if (words.length === 0) {
+      throw new Error('Move must form at least one word');
+    }
+
+    // Check dictionary if available
+    if (this.dictionary) {
+      for (const word of words) {
+        if (!this.dictionary.isValidWord(word)) {
+          throw new Error(`Invalid word: ${word}`);
+        }
+      }
+    }
 
     return true;
+  }
+
+  // Get all words formed by placements
+  getFormedWords(placements) {
+    // Temporarily place tiles on board
+    const tempBoard = JSON.parse(JSON.stringify(this.board));
+    placements.forEach(p => {
+      tempBoard[p.row][p.col].letter = p.letter;
+    });
+
+    const words = [];
+    const isHorizontal = placements.every(p => p.row === placements[0].row);
+
+    if (isHorizontal) {
+      // Main horizontal word
+      const row = placements[0].row;
+      const cols = placements.map(p => p.col).sort((a, b) => a - b);
+      const minCol = cols[0];
+      const maxCol = cols[cols.length - 1];
+
+      // Extend to include adjacent tiles
+      let startCol = minCol;
+      let endCol = maxCol;
+
+      while (startCol > 0 && tempBoard[row][startCol - 1].letter) startCol--;
+      while (endCol < 14 && tempBoard[row][endCol + 1].letter) endCol++;
+
+      // Build main word
+      let word = '';
+      for (let col = startCol; col <= endCol; col++) {
+        word += tempBoard[row][col].letter || '';
+      }
+      if (word.length > 1) words.push(word);
+
+      // Check perpendicular words for each placement
+      placements.forEach(p => {
+        const perpendicularWord = this.getPerpendicularWord(tempBoard, p.row, p.col, false);
+        if (perpendicularWord.length > 1) words.push(perpendicularWord);
+      });
+    } else {
+      // Main vertical word
+      const col = placements[0].col;
+      const rows = placements.map(p => p.row).sort((a, b) => a - b);
+      const minRow = rows[0];
+      const maxRow = rows[rows.length - 1];
+
+      // Extend to include adjacent tiles
+      let startRow = minRow;
+      let endRow = maxRow;
+
+      while (startRow > 0 && tempBoard[startRow - 1][col].letter) startRow--;
+      while (endRow < 14 && tempBoard[endRow + 1][col].letter) endRow++;
+
+      // Build main word
+      let word = '';
+      for (let row = startRow; row <= endRow; row++) {
+        word += tempBoard[row][col].letter || '';
+      }
+      if (word.length > 1) words.push(word);
+
+      // Check perpendicular words for each placement
+      placements.forEach(p => {
+        const perpendicularWord = this.getPerpendicularWord(tempBoard, p.row, p.col, true);
+        if (perpendicularWord.length > 1) words.push(perpendicularWord);
+      });
+    }
+
+    return words;
+  }
+
+  // Get perpendicular word at position
+  getPerpendicularWord(board, row, col, isVertical) {
+    let word = '';
+
+    if (isVertical) {
+      // Check horizontally
+      let startCol = col;
+      let endCol = col;
+
+      while (startCol > 0 && board[row][startCol - 1].letter) startCol--;
+      while (endCol < 14 && board[row][endCol + 1].letter) endCol++;
+
+      for (let c = startCol; c <= endCol; c++) {
+        word += board[row][c].letter || '';
+      }
+    } else {
+      // Check vertically
+      let startRow = row;
+      let endRow = row;
+
+      while (startRow > 0 && board[startRow - 1][col].letter) startRow--;
+      while (endRow < 14 && board[endRow + 1][col].letter) endRow++;
+
+      for (let r = startRow; r <= endRow; r++) {
+        word += board[r][col].letter || '';
+      }
+    }
+
+    return word;
   }
 
   // Calculate score for a move
@@ -366,8 +484,8 @@ class Game {
   }
 
   // Deserialize from database
-  static deserialize(gameId, data) {
-    const game = new Game(gameId);
+  static deserialize(gameId, data, dictionary = null) {
+    const game = new Game(gameId, dictionary);
     // MySQL returns JSON columns as objects, not strings
     const state = typeof data === 'string' ? JSON.parse(data) : data;
     game.board = state.board;

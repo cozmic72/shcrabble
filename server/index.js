@@ -41,7 +41,7 @@ app.get('/shcrabble/api/health', (req, res) => {
 app.get('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const game = new Game(gameId);
+    const game = new Game(gameId, dictionary);
 
     // Store in memory
     games.set(gameId, game);
@@ -80,9 +80,9 @@ io.on('connection', (socket) => {
         }
 
         if (rows[0].game_state) {
-          game = Game.deserialize(gameId, rows[0].game_state);
+          game = Game.deserialize(gameId, rows[0].game_state, dictionary);
         } else {
-          game = new Game(gameId);
+          game = new Game(gameId, dictionary);
         }
         games.set(gameId, game);
       }
@@ -449,7 +449,7 @@ io.on('connection', (socket) => {
       if (!game) {
         const rows = await db.query('SELECT game_state FROM sessions WHERE id = ?', [gameId]);
         if (rows && rows.length > 0 && rows[0].game_state) {
-          game = Game.deserialize(gameId, rows[0].game_state);
+          game = Game.deserialize(gameId, rows[0].game_state, dictionary);
           games.set(gameId, game);
         }
       }
