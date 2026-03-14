@@ -113,6 +113,48 @@ window.addTiles = function(letters) {
   console.log(`Added ${letterArray.length} tiles`);
 }
 
+// Debug function: Remove a tile by index
+window.removeTile = function(index) {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) {
+    console.log('Player not found');
+    return;
+  }
+
+  if (index < 0 || index >= myPlayer.rack.length) {
+    console.log(`Invalid index. Rack has ${myPlayer.rack.length} tiles (0-${myPlayer.rack.length - 1})`);
+    return;
+  }
+
+  const removed = myPlayer.rack.splice(index, 1)[0];
+  updateRack();
+  console.log(`Removed tile at index ${index}: ${removed.isBlank ? '?' : removed.letter}`);
+}
+
+// Debug function: Show current rack with indices
+window.showRack = function() {
+  if (!gameState) {
+    console.log('Not in a game');
+    return;
+  }
+
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) {
+    console.log('Player not found');
+    return;
+  }
+
+  console.log('Current rack:');
+  myPlayer.rack.forEach((tile, i) => {
+    console.log(`  [${i}] ${tile.isBlank ? '?' : tile.letter} (${tile.points} pts)`);
+  });
+}
+
 // Debug function: Clear your rack
 window.clearRack = function() {
   if (!gameState) {
