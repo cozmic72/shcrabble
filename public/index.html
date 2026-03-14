@@ -7,51 +7,92 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Burger Menu -->
+  <div id="burger-menu">
+    <button id="burger-btn" aria-label="Menu">☰</button>
+    <div id="burger-dropdown" class="dropdown" style="display: none;">
+      <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
+      <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
+    </div>
+  </div>
+
+  <!-- Settings Dialog -->
+  <div id="settings-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 data-i18n="settings">Settings</h2>
+        <button class="close-dialog" data-dialog="settings-dialog" aria-label="Close">×</button>
+      </div>
+      <div class="dialog-content">
+        <div class="setting-item">
+          <label data-i18n="script">Script</label>
+          <select id="language-select">
+            <option value="en" data-i18n="roman">Roman</option>
+            <option value="shaw" data-i18n="shavian">Shavian</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- About Dialog -->
+  <div id="about-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 data-i18n="about">About</h2>
+        <button class="close-dialog" data-dialog="about-dialog" aria-label="Close">×</button>
+      </div>
+      <div id="about-content">
+        <!-- Loaded dynamically from i18n -->
+      </div>
+    </div>
+  </div>
+
   <div id="app">
     <!-- Landing/Lobby Screen -->
     <div id="lobby-screen">
-      <h1>𐑖𐑒𐑮𐑨𐑚𐑩𐑤 Shcrabble</h1>
-      <p>Multiplayer Scrabble in the Shavian Alphabet</p>
+      <h1 data-i18n="appTitle">𐑖𐑒𐑮𐑨𐑚𐑩𐑤 Shcrabble</h1>
+      <p data-i18n="appSubtitle">Multiplayer Scrabble in the Shavian Alphabet</p>
 
       <div id="lobby-options">
         <div class="lobby-option">
-          <h2>Create New Game</h2>
-          <input type="text" id="host-name" placeholder="Your name" maxlength="20">
-          <button id="create-game-btn">Create Game</button>
+          <h2 data-i18n="createNewGame">Create New Game</h2>
+          <input type="text" id="host-name" data-i18n="yourName" data-i18n-placeholder="true" placeholder="Your name" maxlength="20">
+          <button id="create-game-btn" data-i18n="createGameBtn">Create Game</button>
         </div>
 
         <div class="lobby-option">
-          <h2>Join Game</h2>
-          <input type="text" id="join-name" placeholder="Your name" maxlength="20">
-          <input type="text" id="game-id" placeholder="Game ID (or use link)">
-          <button id="join-game-btn">Join Game</button>
+          <h2 data-i18n="joinGame">Join Game</h2>
+          <input type="text" id="join-name" data-i18n="yourName" data-i18n-placeholder="true" placeholder="Your name" maxlength="20">
+          <input type="text" id="game-id" data-i18n="gameId" data-i18n-placeholder="true" placeholder="Game ID (or use link)">
+          <button id="join-game-btn" data-i18n="joinGameBtn">Join Game</button>
         </div>
       </div>
 
       <div id="invite-link-container" style="display: none;">
-        <h3>Game Created!</h3>
-        <p>Share this link with other players:</p>
+        <h3 data-i18n="gameCreated">Game Created!</h3>
+        <p data-i18n="shareLink">Share this link with other players:</p>
         <div class="invite-link">
           <input type="text" id="invite-link" readonly>
-          <button id="copy-link-btn">Copy</button>
+          <button id="copy-link-btn" data-i18n="copyBtn">Copy</button>
         </div>
-        <p class="waiting-message">Waiting for players to join...</p>
+        <p class="waiting-message" data-i18n="waitingForPlayers">Waiting for players to join...</p>
       </div>
     </div>
 
     <!-- Game Screen -->
     <div id="game-screen" style="display: none;">
       <div id="game-header">
-        <h1>𐑖𐑒𐑮𐑨𐑚𐑩𐑤 Shcrabble</h1>
+        <h1 data-i18n="appTitle">𐑖𐑒𐑮𐑨𐑚𐑩𐑤 Shcrabble</h1>
         <div id="game-info">
-          <span id="tiles-remaining">Tiles: 100</span>
-          <button id="pass-turn-btn">Pass Turn</button>
+          <span id="tiles-remaining"><span data-i18n="tilesRemaining">Tiles</span>: 100</span>
+          <button id="pass-turn-btn" data-i18n="passTurn">Pass Turn</button>
         </div>
       </div>
 
       <div id="game-container">
         <div id="players-panel">
-          <h2>Players</h2>
+          <h2 data-i18n="players">Players</h2>
           <div id="players-list"></div>
         </div>
 
@@ -60,11 +101,11 @@
         </div>
 
         <div id="rack-container">
-          <h3>Your Rack</h3>
+          <h3 data-i18n="yourRack">Your Rack</h3>
           <div id="rack"></div>
           <div id="move-controls">
-            <button id="submit-move-btn" disabled>Submit Move</button>
-            <button id="recall-tiles-btn">Recall Tiles</button>
+            <button id="submit-move-btn" data-i18n="submitMove" disabled>Submit Move</button>
+            <button id="recall-tiles-btn" data-i18n="recallTiles">Recall Tiles</button>
           </div>
         </div>
       </div>
@@ -74,6 +115,7 @@
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
+  <script src="i18n.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

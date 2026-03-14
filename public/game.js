@@ -5,6 +5,8 @@ let playerId = null;
 let playerIndex = null;
 let currentPlacements = [];
 let draggedTile = null;
+let draggedFromRack = false;
+let rackDragSource = null;
 
 // Initialize socket connection
 function initSocket() {
@@ -28,7 +30,7 @@ function initSocket() {
 
     // If still in lobby, show waiting message
     if (gameState.status === 'waiting') {
-      showMessage(`Waiting for players... (${gameState.players.length}/2 minimum)`, '');
+      showMessage(i18n.t('msgWaitingPlayers', { count: gameState.players.length }), '');
     }
   });
 
@@ -43,7 +45,10 @@ function initSocket() {
     updateGameUI();
 
     if (data.lastMove) {
-      showMessage(`${data.lastMove.playerName} scored ${data.lastMove.score} points!`, 'success');
+      showMessage(i18n.t('msgPlayerScored', {
+        name: data.lastMove.playerName,
+        score: data.lastMove.score
+      }), 'success');
     }
   });
 
@@ -56,7 +61,10 @@ function initSocket() {
   });
 
   socket.on('player-left', (data) => {
-    showMessage(`${data.playerName} left the game. ${data.playersRemaining} player(s) remaining.`, 'error');
+    showMessage(i18n.t('msgPlayerLeft', {
+      name: data.playerName,
+      count: data.playersRemaining
+    }), 'error');
   });
 }
 
@@ -72,6 +80,12 @@ function showMessage(message, type = '') {
   messageArea.className = type;
 }
 
+// Update tiles remaining display
+function updateTilesRemaining(count) {
+  const tilesLabel = i18n.t('tilesRemaining');
+  document.getElementById('tiles-remaining').innerHTML = `<span data-i18n="tilesRemaining">${tilesLabel}</span>: ${count}`;
+}
+
 function updateGameUI() {
   if (!gameState) return;
 
@@ -85,7 +99,7 @@ function updateGameUI() {
   updateRack();
 
   // Update game info
-  document.getElementById('tiles-remaining').textContent = `Tiles: ${gameState.tilesRemaining}`;
+  updateTilesRemaining(gameState.tilesRemaining);
 
   // Enable/disable submit button
   const submitBtn = document.getElementById('submit-move-btn');
@@ -108,10 +122,13 @@ function updatePlayersList() {
       card.classList.add('current-user');
     }
 
+    const scoreLabel = i18n.t('score');
+    const tilesLabel = i18n.t('tiles');
+
     card.innerHTML = `
       <div class="player-name">${player.name}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}</div>
-      <div class="player-score">Score: ${player.score}</div>
-      <div class="player-score">Tiles: ${player.rackCount}</div>
+      <div class="player-score">${scoreLabel}: ${player.score}</div>
+      <div class="player-score">${tilesLabel}: ${player.rackCount}</div>
     `;
 
     playersList.appendChild(card);
@@ -135,7 +152,8 @@ function updateBoard() {
           square.classList.add(bonus);
           const label = document.createElement('div');
           label.className = 'bonus-label';
-          label.textContent = bonus;
+          label.setAttribute('data-bonus', bonus);
+          label.textContent = i18n.t(`bonus${bonus}`);
           square.appendChild(label);
         }
 
@@ -217,16 +235,20 @@ function updateRack() {
 
     rackDiv.appendChild(tileDiv);
   });
+
+  // Make rack itself a drop zone for reordering
+  rackDiv.addEventListener('dragover', handleRackDragOver);
+  rackDiv.addEventListener('drop', handleRackDrop);
 }
 
 function handleSquareClick(row, col) {
   if (gameState.currentPlayerIndex !== playerIndex) {
-    showMessage("It's not your turn!", 'error');
+    showMessage(i18n.t('errorNotYourTurn'), 'error');
     return;
   }
 
   if (gameState.board[row][col].letter) {
-    showMessage("Square already occupied!", 'error');
+    showMessage(i18n.t('errorSquareOccupied'), 'error');
     return;
   }
 
@@ -243,11 +265,11 @@ function handleSquareClick(row, col) {
   // Prompt for letter selection (simplified - in real version, drag & drop)
   const myPlayer = gameState.players.find(p => p.id === playerId);
   if (!myPlayer || !myPlayer.rack || myPlayer.rack.length === 0) {
-    showMessage("No tiles in rack!", 'error');
+    showMessage(i18n.t('errorNoTiles'), 'error');
     return;
   }
 
-  showMessage(`Click a tile in your rack, then click a square to place it`, '');
+  showMessage('', '');
 }
 
 // Drag and drop handlers
@@ -258,11 +280,54 @@ function handleDragStart(e) {
     isBlank: e.target.dataset.isBlank === 'true',
     rackIndex: parseInt(e.target.dataset.index)
   };
+  draggedFromRack = true;
+  rackDragSource = e.target;
   e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
 }
 
 function handleDragEnd(e) {
   e.target.classList.remove('dragging');
+  draggedFromRack = false;
+  rackDragSource = null;
+}
+
+// Handle drag over rack for reordering
+function handleRackDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+}
+
+// Handle drop on rack for reordering
+function handleRackDrop(e) {
+  e.preventDefault();
+
+  if (!draggedFromRack || !rackDragSource) return;
+
+  const rack = document.getElementById('rack');
+  const afterElement = getDragAfterElement(rack, e.clientX);
+
+  if (afterElement == null) {
+    rack.appendChild(rackDragSource);
+  } else {
+    rack.insertBefore(rackDragSource, afterElement);
+  }
+}
+
+// Find the element to insert before when reordering
+function getDragAfterElement(container, x) {
+  const draggableElements = [...container.querySelectorAll('.rack-tile:not(.dragging)')];
+
+  return draggableElements.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = x - box.left - box.width / 2;
+
+    if (offset < 0 && offset > closest.offset) {
+      return { offset: offset, element: child };
+    } else {
+      return closest;
+    }
+  }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
 // Lobby functions
@@ -328,7 +393,7 @@ function copyInviteLink() {
 
 function submitMove() {
   if (currentPlacements.length === 0) {
-    showMessage('No tiles placed!', 'error');
+    showMessage(i18n.t('errorNoTilesPlaced'), 'error');
     return;
   }
 
@@ -344,7 +409,7 @@ function recallTiles() {
   currentPlacements = [];
   updateBoard();
   updateGameUI();
-  showMessage('Tiles recalled', '');
+  showMessage(i18n.t('msgTilesRecalled'), '');
 }
 
 function passTurn() {
@@ -377,6 +442,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.addEventListener('drop', (e) => {
+    // Don't handle if this is a rack reorder
+    if (e.target.closest('#rack')) {
+      return;
+    }
+
     e.preventDefault();
 
     if (!draggedTile) return;
@@ -388,12 +458,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const col = parseInt(target.dataset.col);
 
     if (gameState.board[row][col].letter) {
-      showMessage("Square already occupied!", 'error');
+      showMessage(i18n.t('errorSquareOccupied'), 'error');
       return;
     }
 
     if (currentPlacements.find(p => p.row === row && p.col === col)) {
-      showMessage("Already placed a tile here!", 'error');
+      showMessage(i18n.t('errorAlreadyPlaced'), 'error');
       return;
     }
 
@@ -407,7 +477,64 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     draggedTile = null;
+    draggedFromRack = false;
     updateBoard();
     updateGameUI();
+  });
+
+  // Burger menu handlers
+  document.getElementById('burger-btn').addEventListener('click', () => {
+    const dropdown = document.getElementById('burger-dropdown');
+    dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  });
+
+  // Close dropdown when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#burger-menu')) {
+      document.getElementById('burger-dropdown').style.display = 'none';
+    }
+  });
+
+  // Settings menu
+  document.getElementById('settings-menu-btn').addEventListener('click', () => {
+    document.getElementById('settings-dialog').style.display = 'flex';
+    document.getElementById('burger-dropdown').style.display = 'none';
+  });
+
+  // About menu
+  document.getElementById('about-menu-btn').addEventListener('click', () => {
+    document.getElementById('about-content').innerHTML = i18n.getAbout();
+    document.getElementById('about-dialog').style.display = 'flex';
+    document.getElementById('burger-dropdown').style.display = 'none';
+  });
+
+  // Close dialog handlers
+  document.querySelectorAll('.close-dialog').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      const dialogId = e.target.getAttribute('data-dialog');
+      document.getElementById(dialogId).style.display = 'none';
+    });
+  });
+
+  // Close dialogs on overlay click
+  document.querySelectorAll('.dialog-overlay').forEach(overlay => {
+    overlay.addEventListener('click', (e) => {
+      if (e.target === overlay) {
+        overlay.style.display = 'none';
+      }
+    });
+  });
+
+  // Language select handler
+  document.getElementById('language-select').addEventListener('change', (e) => {
+    i18n.setLanguage(e.target.value);
+  });
+
+  // Initialize i18n
+  i18n.init().then(() => {
+    // Set current language in dropdown
+    document.getElementById('language-select').value = i18n.getLanguage();
+    // Update all text
+    i18n.updateAllText();
   });
 });
