@@ -67,10 +67,8 @@ function initSocket() {
     playerIndex = data.playerIndex;
     gameState = data.gameState;
 
-    // Only show game screen if game is active
-    if (gameState.status === 'active') {
-      showGameScreen();
-    }
+    // Always show game screen when joined
+    showGameScreen();
 
     updateGameUI();
 
