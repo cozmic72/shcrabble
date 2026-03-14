@@ -2,11 +2,14 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
-const { v4: uuidv4 } = require('uuid');
+const crypto = require('crypto');
 
 const Game = require('./game');
 const Dictionary = require('./dictionary');
 const db = require('./db');
+
+// Use Node's built-in UUID generator
+const uuidv4 = () => crypto.randomUUID();
 
 const app = express();
 const server = http.createServer(app);
