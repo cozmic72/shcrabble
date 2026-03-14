@@ -48,6 +48,27 @@ function getUserId() {
   return userId;
 }
 
+// Validate username - allow letters (Unicode), numbers, spaces, hyphens
+function validateUsername(name) {
+  // Allow: letters (any script including Shavian), numbers, spaces, hyphens
+  // Disallow: special chars that could be used for injection
+  const validPattern = /^[\p{L}\p{N}\s-]+$/u;
+
+  if (!name || name.trim().length === 0) {
+    return { valid: false, error: 'Name cannot be empty' };
+  }
+
+  if (name.length > 20) {
+    return { valid: false, error: 'Name must be 20 characters or less' };
+  }
+
+  if (!validPattern.test(name)) {
+    return { valid: false, error: 'Name can only contain letters, numbers, spaces, and hyphens' };
+  }
+
+  return { valid: true };
+}
+
 // Debug function: Show owner info and help become owner
 window.becomeOwner = function() {
   if (!gameState) {
@@ -832,6 +853,7 @@ function createGame() {
 function joinGame() {
   const name = document.getElementById('join-name').value.trim();
   let gameId = document.getElementById('game-id').value.trim();
+  const role = document.querySelector('input[name="join-role"]:checked').value;
 
   if (!name) {
     alert(i18n.t('enterYourName'));
@@ -850,7 +872,8 @@ function joinGame() {
   socket.emit('join-game', {
     gameId: gameId,
     playerName: name,
-    userId: getUserId()
+    userId: getUserId(),
+    asSpectator: role === 'spectator'
   });
 }
 
@@ -1297,14 +1320,14 @@ function leaveGame() {
     // Remove yourself from the game
     const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
     socket.emit('remove-player', { targetPlayerId: playerId, isAdmin });
-    // Navigate to main menu
-    window.location.href = '/shcrabble/';
+    // Navigate to main menu (clear URL to prevent auto-rejoin)
+    window.location.assign('/shcrabble/');
   }
 }
 
 function goToMainMenu() {
-  // Just navigate without leaving the game
-  window.location.href = '/shcrabble/';
+  // Just navigate without leaving the game (clear URL to prevent auto-rejoin)
+  window.location.assign('/shcrabble/');
 }
 
 function endGame() {
@@ -1507,15 +1530,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const gameId = urlParams.get('game');
     const savedName = getUserName();
 
-    // If we have a saved name, join directly. Otherwise show dialog.
-    if (savedName) {
-      // Auto-join the game
-      const userId = getUserId();
-      socket.emit('join-game', { gameId, playerName: savedName, userId });
-    } else {
-      // Show join dialog to get name
-      showJoinGameDialog();
-    }
+    // Always show dialog for role selection
+    showJoinGameDialog();
   }
 
   // Event listeners for lobby buttons

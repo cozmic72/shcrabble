@@ -126,7 +126,7 @@
       <div class="dialog-content">
         <div class="setting-item">
           <label>Your Name</label>
-          <input type="text" id="create-name" placeholder="Your name" maxlength="20">
+          <input type="text" id="create-name" placeholder="Your name" maxlength="20" pattern="[\p{L}\p{N}\s\-@!?|/·]+" title="Letters, numbers, spaces, and basic punctuation">
         </div>
         <div class="setting-item">
           <label>Tiles per Rack</label>
@@ -154,12 +154,25 @@
       </div>
       <div class="dialog-content">
         <div class="setting-item">
-          <label>Your Name</label>
-          <input type="text" id="join-name" placeholder="Your name" maxlength="20">
+          <label data-i18n="yourName">Your Name</label>
+          <input type="text" id="join-name" placeholder="Your name" maxlength="20" pattern="[\p{L}\p{N}\s\-@!?|/·]+" title="Letters, numbers, spaces, and basic punctuation">
         </div>
         <div class="setting-item">
-          <label>Game ID</label>
+          <label data-i18n="gameId">Game ID</label>
           <input type="text" id="game-id" placeholder="Game ID (or use link)">
+        </div>
+        <div class="setting-item">
+          <label data-i18n="joinAs">Join as</label>
+          <div style="display: flex; gap: 20px; margin-top: 5px;">
+            <label class="radio-label">
+              <input type="radio" name="join-role" value="player" checked>
+              <span data-i18n="player">Player</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="join-role" value="spectator">
+              <span data-i18n="spectator">Spectator</span>
+            </label>
+          </div>
         </div>
       </div>
       <div class="dialog-footer">

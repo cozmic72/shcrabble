@@ -11,6 +11,15 @@ const db = require('./db');
 // Use Node's built-in UUID generator
 const uuidv4 = () => crypto.randomUUID();
 
+// Validate username - letters, numbers, spaces, and safe punctuation
+function validateUsername(name) {
+  if (!name || typeof name !== 'string') return false;
+  if (name.trim().length === 0 || name.length > 20) return false;
+  // Allow letters (any script), numbers, spaces, hyphens, @, !, ?, |, /, and namer dot (·)
+  // Disallow quotes and other potentially dangerous chars
+  return /^[\p{L}\p{N}\s\-@!?|/·]+$/u.test(name);
+}
+
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -243,8 +252,14 @@ io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
 
   // Join game
-  socket.on('join-game', async ({ gameId, playerName, userId }) => {
+  socket.on('join-game', async ({ gameId, playerName, userId, asSpectator = false }) => {
     try {
+      // Validate username
+      if (!validateUsername(playerName)) {
+        socket.emit('error', { message: 'Invalid username. Use only letters, numbers, spaces, and basic punctuation (max 20 chars)' });
+        return;
+      }
+
       let game = games.get(gameId);
 
       if (!game) {
@@ -319,8 +334,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Check if game is locked - if so, join as spectator
-      if (game.locked) {
+      // Check if user wants to join as spectator or if game is locked
+      if (asSpectator || game.locked) {
         const spectatorId = uuidv4();
         const spectator = game.addSpectator(spectatorId, playerName);
 
