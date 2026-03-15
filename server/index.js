@@ -61,18 +61,28 @@ app.get('/shcrabble/api/all-games', async (req, res) => {
     // First, get all active games from memory
     for (const [gameId, game] of games.entries()) {
       seenGameIds.add(gameId);
-      allGames.push({
+      const gameData = {
         id: gameId,
         status: game.status,
         players: game.players.map(p => p.name),
         currentTurn: game.players[game.currentPlayerIndex]?.name,
         tilesRemaining: game.tileBag ? game.tileBag.length : 0,
         isActive: true
-      });
+      };
+
+      // Add final scores for completed games
+      if (game.status === 'completed') {
+        gameData.finalScores = game.players.map(p => ({
+          name: p.name,
+          score: p.score
+        })).sort((a, b) => b.score - a.score);
+      }
+
+      allGames.push(gameData);
     }
 
-    // Then, get all games from database
-    const dbRows = await db.query('SELECT id, game_state, status FROM sessions WHERE status != ?', ['completed']);
+    // Then, get all games from database (includes completed games)
+    const dbRows = await db.query('SELECT id, game_state, status FROM sessions');
     for (const row of dbRows) {
       if (seenGameIds.has(row.id)) continue; // Already got this one from memory
 
@@ -87,14 +97,24 @@ app.get('/shcrabble/api/all-games', async (req, res) => {
           ? JSON.parse(row.game_state)
           : row.game_state;
 
-        allGames.push({
+        const gameData = {
           id: row.id,
           status: row.status,
           players: gameState.players ? gameState.players.map(p => p.name) : [],
           currentTurn: gameState.players ? gameState.players[gameState.currentPlayerIndex]?.name : null,
           tilesRemaining: gameState.tileBag ? gameState.tileBag.length : 0,
           isActive: false
-        });
+        };
+
+        // Add final scores for completed games
+        if (row.status === 'completed' && gameState.players) {
+          gameData.finalScores = gameState.players.map(p => ({
+            name: p.name,
+            score: p.score
+          })).sort((a, b) => b.score - a.score);
+        }
+
+        allGames.push(gameData);
       } catch (e) {
         console.error(`Error parsing game state for ${row.id}:`, e);
       }
@@ -132,19 +152,29 @@ app.get('/shcrabble/api/my-games/:userId', async (req, res) => {
 
       if (player) {
         seenGameIds.add(gameId);
-        myGames.push({
+        const gameData = {
           id: gameId,
           status: game.status,
           players: game.players.map(p => p.name),
           currentTurn: game.players[game.currentPlayerIndex]?.name,
           tilesRemaining: game.tileBag ? game.tileBag.length : 0,
           isActive: true
-        });
+        };
+
+        // Add final scores for completed games
+        if (game.status === 'completed') {
+          gameData.finalScores = game.players.map(p => ({
+            name: p.name,
+            score: p.score
+          })).sort((a, b) => b.score - a.score);
+        }
+
+        myGames.push(gameData);
       }
     }
 
-    // Then, check database for games not in memory (all players disconnected)
-    const dbRows = await db.query('SELECT id, game_state, status FROM sessions WHERE status != ?', ['completed']);
+    // Then, check database for games not in memory (includes completed games)
+    const dbRows = await db.query('SELECT id, game_state, status FROM sessions');
     for (const row of dbRows) {
       if (seenGameIds.has(row.id)) continue; // Already got this one from memory
 
@@ -175,14 +205,24 @@ app.get('/shcrabble/api/my-games/:userId', async (req, res) => {
         }
 
         if (hasPlayer) {
-          myGames.push({
+          const gameData = {
             id: row.id,
             status: row.status,
             players: gameState.players.map(p => p.name),
             currentTurn: gameState.players[gameState.currentPlayerIndex]?.name,
             tilesRemaining: gameState.tileBag ? gameState.tileBag.length : 0,
             isActive: false // No one connected
-          });
+          };
+
+          // Add final scores for completed games
+          if (row.status === 'completed') {
+            gameData.finalScores = gameState.players.map(p => ({
+              name: p.name,
+              score: p.score
+            })).sort((a, b) => b.score - a.score);
+          }
+
+          myGames.push(gameData);
         }
       } catch (e) {
         console.error(`Error parsing game state for ${row.id}:`, e);
@@ -285,7 +325,7 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
     }
 
     // Return game configuration
-    res.json({
+    const response = {
       config: {
         rackSize: game.rackSize,
         allowVoting: game.allowVoting,
@@ -296,7 +336,17 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
       },
       playerCount: game.players.length,
       status: game.status
-    });
+    };
+
+    // Add final scores for completed games
+    if (game.status === 'completed') {
+      response.finalScores = game.players.map(p => ({
+        name: p.name,
+        score: p.score
+      })).sort((a, b) => b.score - a.score);
+    }
+
+    res.json(response);
   } catch (err) {
     console.error('Error fetching game info:', err);
     res.status(500).json({ error: 'Failed to fetch game info' });

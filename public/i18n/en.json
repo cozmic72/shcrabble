@@ -96,5 +96,9 @@
   "compoundLetters": "Compound Letters",
   "splitCompounds": "Split (𐑩+𐑮 instead of 𐑼)",
   "useCompounds": "Compound (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)",
-  "advancedSettings": "Advanced Settings"
+  "advancedSettings": "Advanced Settings",
+  "deleteGame": "Delete Game",
+  "confirmDeleteGame": "Delete this game permanently? This cannot be undone.",
+  "gameDeleted": "Game deleted successfully",
+  "failedDeleteGame": "Failed to delete game"
 }

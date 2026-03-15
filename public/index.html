@@ -330,6 +330,11 @@
           </ul>
         </div>
 
+        <!-- Finished Game Summary (shown for completed games) -->
+        <div id="join-game-finished-summary" style="display: none;">
+          <!-- Populated dynamically -->
+        </div>
+
         <div class="setting-item">
           <label data-i18n="joinAs">Join as</label>
           <div style="display: flex; gap: 20px; margin-top: 5px;">
@@ -427,6 +432,7 @@
           <button id="main-menu-game-btn" data-i18n="mainMenu">Main Menu</button>
           <button id="leave-game-btn" data-i18n="leaveGame">Leave Game</button>
           <button id="end-game-btn" style="display: none;" data-i18n="endGame">End Game</button>
+          <button id="delete-game-btn" style="display: none;" data-i18n="deleteGame">Delete Game</button>
         </div>
       </div>
 
@@ -437,6 +443,9 @@
         </div>
 
         <div id="board-container">
+          <div id="game-finished-banner" style="display: none; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 20px; margin-bottom: 15px; border-radius: 8px; text-align: center;">
+            <!-- Populated dynamically for finished games -->
+          </div>
           <div id="board"></div>
         </div>
 

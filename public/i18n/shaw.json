@@ -96,5 +96,9 @@
   "compoundLetters": "𐑒𐑪𐑥𐑐𐑬𐑯𐑛 𐑤𐑧𐑑𐑼𐑟",
   "splitCompounds": "𐑕𐑐𐑤𐑦𐑑 (𐑩+𐑮 𐑦𐑯𐑕𐑑𐑧𐑛 𐑝 𐑼)",
   "useCompounds": "𐑒𐑪𐑥𐑐𐑬𐑯𐑛 (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)",
-  "advancedSettings": "𐑩𐑛𐑝𐑭𐑯𐑕𐑑 𐑕𐑧𐑑𐑦𐑙𐑟"
+  "advancedSettings": "𐑩𐑛𐑝𐑭𐑯𐑕𐑑 𐑕𐑧𐑑𐑦𐑙𐑟",
+  "deleteGame": "𐑛𐑦𐑤𐑰𐑑 𐑜𐑱𐑥",
+  "confirmDeleteGame": "𐑛𐑦𐑤𐑰𐑑 𐑞𐑦𐑕 𐑜𐑱𐑥 𐑐𐑻𐑥𐑩𐑯𐑩𐑯𐑑𐑤𐑦? 𐑞𐑦𐑕 𐑒𐑨𐑯𐑪𐑑 𐑚𐑰 𐑳𐑯𐑛𐑳𐑯.",
+  "gameDeleted": "𐑜𐑱𐑥 𐑛𐑦𐑤𐑰𐑑𐑩𐑛 𐑕𐑩𐑒𐑕𐑧𐑕𐑓𐑩𐑤𐑦",
+  "failedDeleteGame": "𐑓𐑱𐑤𐑛 𐑑 𐑛𐑦𐑤𐑰𐑑 𐑜𐑱𐑥"
 }

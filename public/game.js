@@ -564,12 +564,48 @@ function showMessage(message, type = '') {
 
 // Update tiles remaining display
 function updateTilesRemaining(count) {
-  const tilesLabel = i18n.t('tilesRemaining');
-  document.getElementById('tiles-remaining').innerHTML = `<span data-i18n="tilesRemaining">${tilesLabel}</span>: ${count}`;
+  const tilesRemainingEl = document.getElementById('tiles-remaining');
+
+  // Check if game is completed
+  if (gameState && gameState.status === 'completed') {
+    tilesRemainingEl.innerHTML = `<strong style="color: #667eea; font-size: 1.1em;">🏁 GAME OVER 🏁</strong>`;
+  } else {
+    const tilesLabel = i18n.t('tilesRemaining');
+    tilesRemainingEl.innerHTML = `<span data-i18n="tilesRemaining">${tilesLabel}</span>: ${count}`;
+  }
 }
 
 function updateGameUI() {
   if (!gameState) return;
+
+  // Check if game is completed
+  const isCompleted = gameState.status === 'completed';
+
+  // Show/hide finished game banner
+  const finishedBanner = document.getElementById('game-finished-banner');
+  if (isCompleted) {
+    // Sort players by score to get final standings
+    const finalScores = [...gameState.players].sort((a, b) => b.score - a.score);
+    const winner = finalScores[0];
+
+    const scoresHtml = finalScores.map((p, idx) => {
+      const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+      return `<div style="padding: 3px 0;">${idx + 1}. ${medal} <strong>${p.name}</strong>: ${p.score} points</div>`;
+    }).join('');
+
+    finishedBanner.innerHTML = `
+      <h2 style="margin: 0 0 15px 0; font-size: 1.5em;">🎉 Game Finished! 🎉</h2>
+      <div style="font-size: 1.2em; margin-bottom: 15px;">
+        Winner: <strong style="font-size: 1.3em;">${winner.name}</strong> (${winner.score} points)
+      </div>
+      <div style="font-size: 0.95em; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 15px;">
+        ${scoresHtml}
+      </div>
+    `;
+    finishedBanner.style.display = 'block';
+  } else {
+    finishedBanner.style.display = 'none';
+  }
 
   // Update players list
   updatePlayersList();
@@ -592,9 +628,9 @@ function updateGameUI() {
     }
   }
 
-  // Hide move controls for spectators
+  // Hide move controls for spectators or completed games
   const moveControls = document.getElementById('move-controls');
-  if (playerIndex === null) {
+  if (playerIndex === null || isCompleted) {
     moveControls.style.display = 'none';
   } else {
     moveControls.style.display = 'flex';
@@ -604,14 +640,22 @@ function updateGameUI() {
     submitBtn.disabled = currentPlacements.length === 0 || gameState.currentPlayerIndex !== playerIndex;
   }
 
-  // Show/hide end game button for owner or admin
+  // Show/hide end game button for owner or admin (only for active games)
   const endGameBtn = document.getElementById('end-game-btn');
   const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
   const isOwner = gameState.ownerId === playerId;
-  if ((isOwner || isAdmin) && gameState.status !== 'completed') {
+  if ((isOwner || isAdmin) && !isCompleted) {
     endGameBtn.style.display = 'inline-block';
   } else {
     endGameBtn.style.display = 'none';
+  }
+
+  // Show delete game button for owner or admin (only for completed games)
+  const deleteGameBtn = document.getElementById('delete-game-btn');
+  if ((isOwner || isAdmin) && isCompleted) {
+    deleteGameBtn.style.display = 'inline-block';
+  } else {
+    deleteGameBtn.style.display = 'none';
   }
 
   // Hide leave game button for spectators (they should use Main Menu)
@@ -1476,6 +1520,11 @@ async function fetchAndDisplayGameInfo(gameId) {
   if (!gameId || gameId.length < 8) {
     // Hide config summary if no valid game ID
     document.getElementById('join-game-config-summary').style.display = 'none';
+    document.getElementById('join-game-finished-summary').style.display = 'none';
+    // Reset dialog to default state
+    document.querySelector('#join-game-dialog h2').textContent = 'Join Game';
+    document.querySelector('[name="join-role"]').closest('.setting-item').style.display = 'block';
+    document.getElementById('join-game-confirm-btn').textContent = 'Join Game';
     return;
   }
 
@@ -1483,30 +1532,72 @@ async function fetchAndDisplayGameInfo(gameId) {
     const response = await fetch(`/shcrabble/api/game-info/${encodeURIComponent(gameId)}`);
     if (!response.ok) {
       document.getElementById('join-game-config-summary').style.display = 'none';
+      document.getElementById('join-game-finished-summary').style.display = 'none';
       return;
     }
 
     const data = await response.json();
     const config = data.config;
+    const isCompleted = data.status === 'completed';
 
-    // Populate the join dialog config summary
-    const rulesText = config.rules === 'tournament' ? i18n.t('tournamentRules') : i18n.t('casualRules');
-    document.getElementById('join-config-rules').textContent = rulesText;
-    document.getElementById('join-config-rack-size').textContent = config.rackSize;
+    if (isCompleted) {
+      // Update dialog for completed game
+      document.querySelector('#join-game-dialog h2').textContent = 'View Game';
+      document.getElementById('join-game-confirm-btn').textContent = 'View Game';
 
-    const isCustom = config.customTiles !== null;
-    const distText = isCustom ? i18n.t('customDist') : i18n.t('defaultDist');
-    document.getElementById('join-config-tile-dist').textContent = distText;
-    document.getElementById('join-config-total-tiles').textContent = config.totalTiles;
+      // Hide role selector
+      document.querySelector('[name="join-role"]').closest('.setting-item').style.display = 'none';
 
-    const votingText = config.allowVoting ? i18n.t('yes') : i18n.t('no');
-    document.getElementById('join-config-voting').textContent = votingText;
+      // Hide config summary, show finished summary
+      document.getElementById('join-game-config-summary').style.display = 'none';
 
-    // Show the config summary
-    document.getElementById('join-game-config-summary').style.display = 'block';
+      // Show final scores
+      const finishedSummary = document.getElementById('join-game-finished-summary');
+      const winner = data.finalScores[0];
+      const scoresHtml = data.finalScores.map((p, idx) => {
+        const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : '';
+        return `<div style="padding: 5px 0;">${idx + 1}. ${medal} <strong>${p.name}</strong>: ${p.score} points</div>`;
+      }).join('');
+
+      finishedSummary.innerHTML = `
+        <div style="background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 0.9em; color: #667eea;">Game Finished</h4>
+          <div style="font-size: 0.9em; margin-bottom: 10px;">
+            Winner: <strong style="color: #4caf50;">${winner.name}</strong> (${winner.score} points)
+          </div>
+          <div style="font-size: 0.85em; border-top: 1px solid #ddd; padding-top: 8px;">
+            ${scoresHtml}
+          </div>
+        </div>
+      `;
+      finishedSummary.style.display = 'block';
+    } else {
+      // Reset dialog to normal join state
+      document.querySelector('#join-game-dialog h2').textContent = 'Join Game';
+      document.getElementById('join-game-confirm-btn').textContent = 'Join Game';
+      document.querySelector('[name="join-role"]').closest('.setting-item').style.display = 'block';
+      document.getElementById('join-game-finished-summary').style.display = 'none';
+
+      // Populate the join dialog config summary
+      const rulesText = config.rules === 'tournament' ? i18n.t('tournamentRules') : i18n.t('casualRules');
+      document.getElementById('join-config-rules').textContent = rulesText;
+      document.getElementById('join-config-rack-size').textContent = config.rackSize;
+
+      const isCustom = config.customTiles !== null;
+      const distText = isCustom ? i18n.t('customDist') : i18n.t('defaultDist');
+      document.getElementById('join-config-tile-dist').textContent = distText;
+      document.getElementById('join-config-total-tiles').textContent = config.totalTiles;
+
+      const votingText = config.allowVoting ? i18n.t('yes') : i18n.t('no');
+      document.getElementById('join-config-voting').textContent = votingText;
+
+      // Show the config summary
+      document.getElementById('join-game-config-summary').style.display = 'block';
+    }
   } catch (err) {
     console.error('Error fetching game info:', err);
     document.getElementById('join-game-config-summary').style.display = 'none';
+    document.getElementById('join-game-finished-summary').style.display = 'none';
   }
 }
 
@@ -1616,7 +1707,10 @@ function createGame() {
 function joinGame() {
   const name = document.getElementById('join-name').value.trim();
   let gameId = document.getElementById('game-id').value.trim();
-  const role = document.querySelector('input[name="join-role"]:checked').value;
+  const roleSelector = document.querySelector('[name="join-role"]').closest('.setting-item');
+  const role = roleSelector.style.display === 'none'
+    ? 'spectator'  // Force spectator for completed games
+    : document.querySelector('input[name="join-role"]:checked').value;
 
   if (!name) {
     alert(i18n.t('enterYourName'));
@@ -2123,6 +2217,30 @@ function endGame() {
   }
 }
 
+async function deleteGame() {
+  if (!confirm(i18n.t('confirmDeleteGame'))) {
+    return;
+  }
+
+  try {
+    const response = await fetch('/shcrabble/api/delete-games', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameIds: [gameState.gameId] })
+    });
+
+    if (response.ok) {
+      alert(i18n.t('gameDeleted'));
+      window.location.href = '/shcrabble/';
+    } else {
+      alert(i18n.t('failedDeleteGame'));
+    }
+  } catch (err) {
+    console.error('Error deleting game:', err);
+    alert(i18n.t('failedDeleteGame'));
+  }
+}
+
 function hideGameControls() {
   // Hide rack and controls
   const rackContainer = document.getElementById('rack-container');
@@ -2193,9 +2311,10 @@ async function showMyGamesDialog(showAllGames = false) {
       gameDiv.style.alignItems = 'center';
       gameDiv.style.gap = '10px';
 
-      const statusColor = game.status === 'active' ? '#4caf50' : '#ff9800';
+      const isCompleted = game.status === 'completed';
+      const statusColor = isCompleted ? '#999' : (game.status === 'active' ? '#4caf50' : '#ff9800');
       const isYourTurn = game.currentTurn === playerName;
-      const turnIndicator = isYourTurn ? ' 🟢 Your turn!' : '';
+      const turnIndicator = isYourTurn && !isCompleted ? ' 🟢 Your turn!' : '';
       const activeIndicator = game.isActive ? '' : ' 💤 (No one connected)';
 
       // Add checkbox only in admin mode
@@ -2203,9 +2322,30 @@ async function showMyGamesDialog(showAllGames = false) {
         ? `<input type="checkbox" class="game-checkbox" data-game-id="${game.id}" style="width: 20px; height: 20px; cursor: pointer;">`
         : '';
 
-      gameDiv.innerHTML = `
-        ${checkboxHtml}
-        <div style="flex: 1; cursor: pointer;" class="game-info">
+      // Build game info
+      let gameInfoHtml = '';
+      if (isCompleted) {
+        // Show final scores for completed games
+        const winner = game.finalScores[0];
+        const scoresPreview = game.finalScores.slice(0, 3).map((p, idx) => {
+          const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉';
+          return `${medal} ${p.name} (${p.score})`;
+        }).join(', ');
+
+        gameInfoHtml = `
+          <div style="font-weight: bold; margin-bottom: 5px;">
+            <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}... <span style="color: #999; font-weight: normal;">[FINISHED]</span>
+          </div>
+          <div style="font-size: 0.9em; color: #666;">
+            Winner: <strong>${winner.name}</strong> (${winner.score} points)
+          </div>
+          <div style="font-size: 0.85em; color: #888;">
+            ${scoresPreview}
+          </div>
+        `;
+      } else {
+        // Show active game info
+        gameInfoHtml = `
           <div style="font-weight: bold; margin-bottom: 5px;">
             <span style="color: ${statusColor};">●</span> Game ${game.id.substring(0, 8)}...${activeIndicator}
           </div>
@@ -2215,6 +2355,13 @@ async function showMyGamesDialog(showAllGames = false) {
           <div style="font-size: 0.9em; color: #666;">
             Tiles remaining: ${game.tilesRemaining}${turnIndicator}
           </div>
+        `;
+      }
+
+      gameDiv.innerHTML = `
+        ${checkboxHtml}
+        <div style="flex: 1; cursor: pointer;" class="game-info">
+          ${gameInfoHtml}
         </div>
       `;
 
@@ -2391,6 +2538,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('main-menu-game-btn').addEventListener('click', goToMainMenu);
   document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
+  document.getElementById('delete-game-btn').addEventListener('click', deleteGame);
 
   // Vote button handlers
   document.getElementById('vote-accept-btn').addEventListener('click', () => {
