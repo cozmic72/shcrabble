@@ -766,7 +766,14 @@ function updatePlayersList() {
     // Calculate time display if timer is enabled
     let timeDisplay = '';
     if (timerEnabled) {
-      const timeUsed = player.timeUsed || 0;
+      let timeUsed = player.timeUsed || 0;
+
+      // Add current turn elapsed time if this is the current player and timer is running
+      if (idx === gameState.currentPlayerIndex && gameState.timer?.turnStartTime && !gameState.timer?.paused) {
+        const elapsed = Math.floor((Date.now() - gameState.timer.turnStartTime) / 1000);
+        timeUsed += elapsed;
+      }
+
       const timeLimit = gameState.config.timeLimit || 1500;
       const timeRemaining = Math.max(0, timeLimit - timeUsed);
       const isLowTime = timeRemaining < 60 && idx === gameState.currentPlayerIndex;
