@@ -357,9 +357,25 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
 app.post('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const { rackSize = 9, allowVoting = true, rules = 'casual', useCompounds = false, customTiles = null } = req.body;
+    const {
+      rackSize = 9,
+      allowVoting = true,
+      rules = 'casual',
+      useCompounds = false,
+      customTiles = null,
+      timerEnabled = false,
+      timeLimit = 25 * 60 // Default 25 minutes in seconds
+    } = req.body;
 
-    const game = new Game(gameId, dictionary, { rackSize, allowVoting, rules, useCompounds, customTiles });
+    const game = new Game(gameId, dictionary, {
+      rackSize,
+      allowVoting,
+      rules,
+      useCompounds,
+      customTiles,
+      timerEnabled,
+      timeLimit
+    });
 
     // Store in memory
     games.set(gameId, game);

@@ -255,6 +255,21 @@
               </div>
               <button id="edit-tiles-btn" style="margin-top: 10px; display: none;">Edit Tile Distribution</button>
             </div>
+            <div class="setting-item">
+              <label style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="timer-enabled" style="width: 20px; height: 20px;">
+                <span data-i18n="enableTimer">Enable Timer</span>
+              </label>
+              <div id="timer-settings" style="display: none; margin-top: 10px; padding-left: 30px;">
+                <label>
+                  <span data-i18n="timeLimitPerPlayer">Time Limit per Player</span>
+                  <div style="display: flex; gap: 10px; align-items: center; margin-top: 5px;">
+                    <input type="number" id="time-limit-minutes" min="1" max="60" value="25" style="width: 60px;">
+                    <span data-i18n="minutes">minutes</span>
+                  </div>
+                </label>
+              </div>
+            </div>
           </div>
         </details>
       </div>

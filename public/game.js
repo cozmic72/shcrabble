@@ -667,6 +667,13 @@ function updateGameUI() {
   }
 }
 
+// Helper function to format time in MM:SS
+function formatTime(seconds) {
+  const mins = Math.floor(seconds / 60);
+  const secs = seconds % 60;
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
 function updatePlayersList() {
   const playersList = document.getElementById('players-list');
   playersList.innerHTML = '';
@@ -676,6 +683,8 @@ function updatePlayersList() {
   playersHeader.className = 'section-header';
   playersHeader.textContent = i18n.t('players') || 'Players';
   playersList.appendChild(playersHeader);
+
+  const timerEnabled = gameState.config?.timerEnabled || false;
 
   gameState.players.forEach((player, idx) => {
     const card = document.createElement('div');
@@ -709,10 +718,22 @@ function updatePlayersList() {
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
 
+    // Calculate time display if timer is enabled
+    let timeDisplay = '';
+    if (timerEnabled) {
+      const timeUsed = player.timeUsed || 0;
+      const timeLimit = gameState.config.timeLimit || 1500;
+      const timeRemaining = Math.max(0, timeLimit - timeUsed);
+      const isLowTime = timeRemaining < 60 && idx === gameState.currentPlayerIndex;
+      const timeColor = isLowTime ? 'color: #f44336;' : '';
+      timeDisplay = `<div class="player-score" style="${timeColor}">${i18n.t('timeRemaining')}: ${formatTime(timeRemaining)}</div>`;
+    }
+
     card.innerHTML = `
       <div class="player-name">${player.name}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${statusLabel}</div>
       <div class="player-score">${scoreLabel}: ${player.score}</div>
       <div class="player-score">${tilesLabel}: ${player.rackCount}</div>
+      ${timeDisplay}
       ${removeBtn}
     `;
 
@@ -1652,6 +1673,8 @@ function createGame() {
   const rules = document.querySelector('input[name="game-rules"]:checked').value;
   const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
   const customTileDistribution = getSelectedTileDistribution();
+  const timerEnabled = document.getElementById('timer-enabled').checked;
+  const timeLimitMinutes = parseInt(document.getElementById('time-limit-minutes').value) || 25;
 
   if (!name) {
     alert(i18n.t('enterYourName'));
@@ -1675,7 +1698,9 @@ function createGame() {
       allowVoting,
       rules,
       useCompounds,
-      customTiles: customTileDistribution
+      customTiles: customTileDistribution,
+      timerEnabled,
+      timeLimit: timeLimitMinutes * 60 // Convert to seconds
     })
   })
     .then(res => res.json())
@@ -2519,6 +2544,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // Event listeners for lobby buttons
   document.getElementById('create-game-btn').addEventListener('click', showCreateGameDialog);
   document.getElementById('join-game-btn').addEventListener('click', showJoinGameDialog);
+
+  // Timer enabled checkbox toggle
+  document.getElementById('timer-enabled').addEventListener('change', (e) => {
+    document.getElementById('timer-settings').style.display = e.target.checked ? 'block' : 'none';
+  });
 
   // Event listeners for dialog confirm buttons
   document.getElementById('create-game-confirm-btn').addEventListener('click', createGame);

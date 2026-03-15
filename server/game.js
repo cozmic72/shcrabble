@@ -38,6 +38,12 @@ class Game {
     this.useCompounds = options.useCompounds || false; // Use compound letters (𐑼, 𐑽, etc.)
     this.customTiles = options.customTiles || null; // Custom tile distribution
     this.consecutiveScorelessTurns = 0; // Track consecutive passes/exchanges for endgame
+
+    // Timer settings
+    this.timerEnabled = options.timerEnabled || false; // Whether timer is enabled
+    this.timeLimit = options.timeLimit || 25 * 60; // Time limit per player in seconds (default 25 minutes)
+    this.timerPaused = false; // Whether timer is paused
+    this.turnStartTime = null; // Timestamp when current turn started
   }
 
   // Load tile definitions and metadata from CSV (without initializing tileBag)
@@ -153,7 +159,8 @@ class Game {
       rack: this.drawTiles(this.rackSize),
       index: this.players.length,
       connected: true,
-      hasLeft: false
+      hasLeft: false,
+      timeUsed: 0 // Accumulative time used in seconds
     };
 
     this.players.push(player);
@@ -165,6 +172,8 @@ class Game {
 
     if (this.players.length === 2 && this.status === 'waiting') {
       this.status = 'active';
+      // Start timer when game becomes active
+      this.startTurnTimer();
     }
 
     return player;
@@ -665,8 +674,63 @@ class Game {
     }
   }
 
+  // Start timer for current turn
+  startTurnTimer() {
+    if (this.timerEnabled && !this.timerPaused && this.status === 'active') {
+      this.turnStartTime = Date.now();
+    }
+  }
+
+  // Stop timer and add elapsed time to current player
+  stopTurnTimer() {
+    if (this.timerEnabled && this.turnStartTime && !this.timerPaused) {
+      const elapsed = Math.floor((Date.now() - this.turnStartTime) / 1000);
+      const currentPlayer = this.players[this.currentPlayerIndex];
+      if (currentPlayer) {
+        currentPlayer.timeUsed += elapsed;
+      }
+      this.turnStartTime = null;
+    }
+  }
+
+  // Pause the timer
+  pauseTimer() {
+    if (this.timerEnabled) {
+      this.stopTurnTimer(); // Save current elapsed time
+      this.timerPaused = true;
+    }
+  }
+
+  // Resume the timer
+  resumeTimer() {
+    if (this.timerEnabled && this.timerPaused) {
+      this.timerPaused = false;
+      this.startTurnTimer(); // Restart timer for current turn
+    }
+  }
+
+  // Get current turn time remaining (in seconds)
+  getCurrentTurnTime() {
+    if (!this.timerEnabled) return null;
+
+    const currentPlayer = this.players[this.currentPlayerIndex];
+    if (!currentPlayer) return null;
+
+    let timeUsed = currentPlayer.timeUsed;
+
+    // Add current turn elapsed time if timer is running
+    if (this.turnStartTime && !this.timerPaused) {
+      const currentElapsed = Math.floor((Date.now() - this.turnStartTime) / 1000);
+      timeUsed += currentElapsed;
+    }
+
+    return Math.max(0, this.timeLimit - timeUsed);
+  }
+
   nextTurn() {
+    this.stopTurnTimer(); // Stop timer for ending turn
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
+    this.startTurnTimer(); // Start timer for new turn
   }
 
   getCurrentPlayer() {
@@ -687,6 +751,8 @@ class Game {
         score: p.score,
         rackCount: p.rack.length,
         connected: p.connected,
+        timeUsed: p.timeUsed || 0,
+        hasLeft: p.hasLeft,
         // Send rack to the player themselves OR to spectators
         rack: (forPlayerId === p.id || isSpectator) ? p.rack : undefined
       })),
@@ -706,13 +772,31 @@ class Game {
         rules: this.rules,
         useCompounds: this.useCompounds,
         customTiles: this.customTiles,
-        totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100
-      }
+        totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100,
+        timerEnabled: this.timerEnabled,
+        timeLimit: this.timeLimit
+      },
+      // Timer state
+      timer: this.timerEnabled ? {
+        enabled: true,
+        paused: this.timerPaused,
+        timeLimit: this.timeLimit,
+        turnStartTime: this.turnStartTime
+      } : null
     };
   }
 
   // Serialize for database storage
   serialize() {
+    // Stop timer and save elapsed time before serializing
+    if (this.timerEnabled && this.turnStartTime && !this.timerPaused) {
+      const elapsed = Math.floor((Date.now() - this.turnStartTime) / 1000);
+      const currentPlayer = this.players[this.currentPlayerIndex];
+      if (currentPlayer) {
+        currentPlayer.timeUsed += elapsed;
+      }
+    }
+
     return JSON.stringify({
       board: this.board,
       players: this.players,
@@ -728,7 +812,10 @@ class Game {
       rules: this.rules,
       useCompounds: this.useCompounds,
       consecutiveScorelessTurns: this.consecutiveScorelessTurns,
-      customTiles: this.customTiles
+      customTiles: this.customTiles,
+      timerEnabled: this.timerEnabled,
+      timeLimit: this.timeLimit,
+      timerPaused: this.timerPaused
     });
   }
 
@@ -742,7 +829,9 @@ class Game {
       allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
       rules: state.rules || 'casual',
       useCompounds: state.useCompounds || false,
-      customTiles: state.customTiles || null
+      customTiles: state.customTiles || null,
+      timerEnabled: state.timerEnabled || false,
+      timeLimit: state.timeLimit || 25 * 60
     };
 
     const game = new Game(gameId, dictionary, options);
@@ -756,6 +845,8 @@ class Game {
     game.turnsTaken = state.turnsTaken || 0;
     game.ownerId = state.ownerId || null;
     game.consecutiveScorelessTurns = state.consecutiveScorelessTurns || 0;
+    game.timerPaused = state.timerPaused || false;
+    // Don't restore turnStartTime - it will be set when game resumes
     game.loadTileInfo(); // Load tile definitions only (preserves tileBag)
     return game;
   }
