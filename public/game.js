@@ -613,6 +613,14 @@ function updateGameUI() {
   } else {
     endGameBtn.style.display = 'none';
   }
+
+  // Hide leave game button for spectators (they should use Main Menu)
+  const leaveGameBtn = document.getElementById('leave-game-btn');
+  if (playerIndex === null) {
+    leaveGameBtn.style.display = 'none';
+  } else {
+    leaveGameBtn.style.display = 'inline-block';
+  }
 }
 
 function updatePlayersList() {
