@@ -1045,6 +1045,17 @@ body {
     font-size: 0.85em;
   }
 
+  .section-header {
+    flex: 0 0 auto;
+    padding: 10px;
+    font-weight: bold;
+    color: #667eea;
+    font-size: 0.9em;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
   .player-score {
     font-size: 0.8em;
   }

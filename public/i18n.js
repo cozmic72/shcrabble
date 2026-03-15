@@ -5,6 +5,7 @@ class I18n {
     this.translations = {};
     this.aboutContent = {};
     this.welcomeContent = {};
+    this.rulesContent = {};
   }
 
   async init() {
@@ -15,6 +16,8 @@ class I18n {
     await this.loadAbout('shaw');
     await this.loadWelcome('en');
     await this.loadWelcome('shaw');
+    await this.loadRules('en');
+    await this.loadRules('shaw');
   }
 
   async loadLanguage(lang) {
@@ -41,6 +44,15 @@ class I18n {
       this.welcomeContent[lang] = await response.text();
     } catch (err) {
       console.error(`Failed to load welcome content for ${lang}:`, err);
+    }
+  }
+
+  async loadRules(lang) {
+    try {
+      const response = await fetch(`/shcrabble/i18n/rules-${lang}.html`);
+      this.rulesContent[lang] = await response.text();
+    } catch (err) {
+      console.error(`Failed to load rules content for ${lang}:`, err);
     }
   }
 
@@ -71,6 +83,10 @@ class I18n {
 
   getWelcome() {
     return this.welcomeContent[this.currentLang] || '';
+  }
+
+  getRules() {
+    return this.rulesContent[this.currentLang] || '';
   }
 
   updateAllText() {

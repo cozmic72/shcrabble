@@ -32,6 +32,10 @@ let boardTranslateX = 0;
 let boardTranslateY = 0;
 let pinchStartDistance = 0;
 let pinchStartScale = 1;
+let pinchStartX = 0;
+let pinchStartY = 0;
+let pinchStartTranslateX = 0;
+let pinchStartTranslateY = 0;
 let isPinching = false;
 
 // All Shavian letters for blank tile selection
@@ -222,13 +226,31 @@ function initSocket() {
 
     updateGameUI();
 
+    // Check if this player is the game owner
+    const isOwner = playerId === gameState.ownerId;
+
+    // If this is the game owner, populate and potentially show the game-created dialog
+    if (isOwner && gameState.config) {
+      const config = gameState.config;
+      populateGameConfigSummary(
+        config.rackSize,
+        config.allowVoting,
+        config.rules,
+        config.customTiles
+      );
+
+      // Update invite link
+      const inviteLink = window.location.origin + `/shcrabble/?game=${gameState.gameId}`;
+      document.getElementById('invite-link').value = inviteLink;
+    }
+
     // Show welcome dialog on first visit
     const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
     if (!hideWelcome) {
       document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
       document.getElementById('welcome-dialog').style.display = 'flex';
-    } else if (pendingGameCreatedDialog) {
-      // If welcome is hidden and we have a pending game-created dialog, show it now
+    } else if (isOwner) {
+      // Always show game-created dialog for owner (after welcome if not hidden)
       document.getElementById('game-created-dialog').style.display = 'flex';
       pendingGameCreatedDialog = false;
     }
@@ -371,6 +393,36 @@ function initSocket() {
     window.location.reload();
   });
 
+  socket.on('ownership-transferred', (data) => {
+    // Update game state to reflect new owner
+    if (gameState) {
+      gameState.ownerId = data.newOwnerId;
+    }
+
+    // Show message about ownership transfer
+    if (playerId === data.newOwnerId) {
+      showMessage(i18n.t('youAreNowOwner'), 'info');
+
+      // Update config summary and invite link for new owner
+      if (gameState && gameState.config) {
+        const config = gameState.config;
+        populateGameConfigSummary(
+          config.rackSize,
+          config.allowVoting,
+          config.rules,
+          config.customTiles
+        );
+        const inviteLink = window.location.origin + `/shcrabble/?game=${gameState.gameId}`;
+        document.getElementById('invite-link').value = inviteLink;
+      }
+    } else {
+      showMessage(i18n.t('ownershipTransferred', { name: data.newOwnerName }), 'info');
+    }
+
+    // Update UI to show/hide owner controls
+    updateGameUI();
+  });
+
   socket.on('game-ended', (data) => {
     showGameEndedDialog(data.finalScores);
     // Hide game controls since game is over
@@ -378,6 +430,12 @@ function initSocket() {
 
     // Play game ended sound
     if (window.sounds) sounds.gameEnded();
+  });
+
+  socket.on('suggest-end-game', (data) => {
+    if (data.reason === 'six-consecutive-scoreless-turns') {
+      document.getElementById('suggest-end-game-dialog').style.display = 'flex';
+    }
   });
 
   socket.on('game-deleted', (data) => {
@@ -545,6 +603,12 @@ function updatePlayersList() {
   const playersList = document.getElementById('players-list');
   playersList.innerHTML = '';
 
+  // Add "Players" header as inline element for mobile
+  const playersHeader = document.createElement('div');
+  playersHeader.className = 'section-header';
+  playersHeader.textContent = i18n.t('players') || 'Players';
+  playersList.appendChild(playersHeader);
+
   gameState.players.forEach((player, idx) => {
     const card = document.createElement('div');
     card.className = 'player-card';
@@ -602,9 +666,9 @@ function updatePlayersList() {
 
   // Add spectators section if any
   if (gameState.spectators && gameState.spectators.length > 0) {
-    const spectatorsHeader = document.createElement('h3');
-    spectatorsHeader.textContent = 'Spectators';
-    spectatorsHeader.style.marginTop = '20px';
+    const spectatorsHeader = document.createElement('div');
+    spectatorsHeader.className = 'section-header';
+    spectatorsHeader.textContent = i18n.t('spectators') || 'Spectators';
     playersList.appendChild(spectatorsHeader);
 
     gameState.spectators.forEach(spectator => {
@@ -1225,33 +1289,76 @@ function setupBoardPinchZoom() {
   const boardContainer = document.getElementById('board-container');
   if (!boardContainer) return;
 
-  let initialTouches = [];
-
   boardContainer.addEventListener('touchstart', (e) => {
     if (e.touches.length === 2) {
       isPinching = true;
-      initialTouches = Array.from(e.touches);
+
+      // Calculate initial pinch center point
+      pinchStartX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      pinchStartY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      // Calculate initial distance between fingers
       pinchStartDistance = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
+
+      // Store current state
       pinchStartScale = boardScale;
+      pinchStartTranslateX = boardTranslateX;
+      pinchStartTranslateY = boardTranslateY;
+
+      // Get board position relative to container
+      const board = document.getElementById('board');
+      const containerRect = boardContainer.getBoundingClientRect();
+      const boardRect = board.getBoundingClientRect();
+
+      // Store offset from container to board
+      const offsetX = pinchStartX - containerRect.left;
+      const offsetY = pinchStartY - containerRect.top;
+
       e.preventDefault();
     }
   }, { passive: false });
 
   boardContainer.addEventListener('touchmove', (e) => {
     if (e.touches.length === 2 && isPinching) {
+      // Calculate current pinch center
+      const currentX = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+      const currentY = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+
+      // Calculate current distance
       const currentDistance = Math.hypot(
         e.touches[0].clientX - e.touches[1].clientX,
         e.touches[0].clientY - e.touches[1].clientY
       );
 
-      boardScale = Math.max(0.5, Math.min(3, pinchStartScale * (currentDistance / pinchStartDistance)));
+      // Calculate new scale
+      const newScale = Math.max(0.5, Math.min(3, pinchStartScale * (currentDistance / pinchStartDistance)));
 
+      // Calculate how much the pinch center has moved
+      const deltaX = currentX - pinchStartX;
+      const deltaY = currentY - pinchStartY;
+
+      // Calculate translation needed to keep pinch point anchored
+      const scaleDelta = newScale - pinchStartScale;
+      const containerRect = boardContainer.getBoundingClientRect();
+      const focusX = pinchStartX - containerRect.left;
+      const focusY = pinchStartY - containerRect.top;
+
+      // Adjust translation to keep the pinch point stable
+      const newTranslateX = pinchStartTranslateX + deltaX - (focusX * scaleDelta);
+      const newTranslateY = pinchStartTranslateY + deltaY - (focusY * scaleDelta);
+
+      // Update state
+      boardScale = newScale;
+      boardTranslateX = newTranslateX;
+      boardTranslateY = newTranslateY;
+
+      // Apply transform
       const board = document.getElementById('board');
       if (board) {
-        board.style.transform = `scale(${boardScale})`;
+        board.style.transform = `translate(${boardTranslateX}px, ${boardTranslateY}px) scale(${boardScale})`;
         board.style.transformOrigin = 'top left';
       }
 
@@ -1337,6 +1444,44 @@ function showCreateGameDialog() {
   document.getElementById('create-game-dialog').style.display = 'flex';
 }
 
+async function fetchAndDisplayGameInfo(gameId) {
+  if (!gameId || gameId.length < 8) {
+    // Hide config summary if no valid game ID
+    document.getElementById('join-game-config-summary').style.display = 'none';
+    return;
+  }
+
+  try {
+    const response = await fetch(`/shcrabble/api/game-info/${encodeURIComponent(gameId)}`);
+    if (!response.ok) {
+      document.getElementById('join-game-config-summary').style.display = 'none';
+      return;
+    }
+
+    const data = await response.json();
+    const config = data.config;
+
+    // Populate the join dialog config summary
+    const rulesText = config.rules === 'tournament' ? i18n.t('tournamentRules') : i18n.t('casualRules');
+    document.getElementById('join-config-rules').textContent = rulesText;
+    document.getElementById('join-config-rack-size').textContent = config.rackSize;
+
+    const isCustom = config.customTiles !== null;
+    const distText = isCustom ? i18n.t('customDist') : i18n.t('defaultDist');
+    document.getElementById('join-config-tile-dist').textContent = distText;
+    document.getElementById('join-config-total-tiles').textContent = config.totalTiles;
+
+    const votingText = config.allowVoting ? i18n.t('yes') : i18n.t('no');
+    document.getElementById('join-config-voting').textContent = votingText;
+
+    // Show the config summary
+    document.getElementById('join-game-config-summary').style.display = 'block';
+  } catch (err) {
+    console.error('Error fetching game info:', err);
+    document.getElementById('join-game-config-summary').style.display = 'none';
+  }
+}
+
 function showJoinGameDialog() {
   // Prepopulate name from localStorage
   const savedName = getUserName();
@@ -1347,16 +1492,45 @@ function showJoinGameDialog() {
   // Check URL params for game ID
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('game')) {
-    document.getElementById('game-id').value = urlParams.get('game');
+    const gameId = urlParams.get('game');
+    document.getElementById('game-id').value = gameId;
+    // Fetch and display game info
+    fetchAndDisplayGameInfo(gameId);
   }
 
   document.getElementById('join-game-dialog').style.display = 'flex';
+}
+
+function populateGameConfigSummary(rackSize, allowVoting, rules, customTileDistribution) {
+  // Populate rules
+  const rulesText = rules === 'tournament' ? i18n.t('tournamentRules') : i18n.t('casualRules');
+  document.getElementById('config-rules').textContent = rulesText;
+
+  // Populate rack size
+  document.getElementById('config-rack-size').textContent = rackSize;
+
+  // Populate tile distribution
+  const isCustom = customTileDistribution !== null;
+  const distText = isCustom ? i18n.t('customDist') : i18n.t('defaultDist');
+  document.getElementById('config-tile-dist').textContent = distText;
+
+  // Calculate total tiles
+  let totalTiles = 100; // default
+  if (isCustom) {
+    totalTiles = customTileDistribution.reduce((sum, tile) => sum + tile.count, 0);
+  }
+  document.getElementById('config-total-tiles').textContent = totalTiles;
+
+  // Populate voting
+  const votingText = allowVoting ? i18n.t('yes') : i18n.t('no');
+  document.getElementById('config-voting').textContent = votingText;
 }
 
 function createGame() {
   const name = document.getElementById('create-name').value.trim();
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
+  const rules = document.querySelector('input[name="game-rules"]:checked').value;
   const customTileDistribution = getSelectedTileDistribution();
 
   if (!name) {
@@ -1379,6 +1553,7 @@ function createGame() {
     body: JSON.stringify({
       rackSize,
       allowVoting,
+      rules,
       customTiles: customTileDistribution
     })
   })
@@ -1388,6 +1563,9 @@ function createGame() {
 
       const inviteLink = window.location.origin + data.inviteLink;
       document.getElementById('invite-link').value = inviteLink;
+
+      // Populate game configuration summary
+      populateGameConfigSummary(rackSize, allowVoting, rules, customTileDistribution);
 
       // Set flag to show game-created dialog after welcome dialog is dismissed
       pendingGameCreatedDialog = true;
@@ -2013,7 +2191,11 @@ async function showMyGamesDialog(showAllGames = false) {
       // Only navigate when clicking the info area, not the checkbox
       const infoDiv = gameDiv.querySelector('.game-info');
       infoDiv.addEventListener('click', () => {
-        window.location.href = `/shcrabble/?game=${game.id}`;
+        // Close my-games dialog and open join-game dialog with pre-filled game ID
+        document.getElementById('my-games-dialog').style.display = 'none';
+        document.getElementById('game-id').value = game.id;
+        document.getElementById('join-name').value = getUserName();
+        document.getElementById('join-game-dialog').style.display = 'flex';
       });
 
       gamesList.appendChild(gameDiv);
@@ -2191,6 +2373,12 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('create-game-confirm-btn').addEventListener('click', createGame);
   document.getElementById('join-game-confirm-btn').addEventListener('click', joinGame);
   document.getElementById('copy-link-btn').addEventListener('click', copyInviteLink);
+
+  // Fetch game info when game ID is entered or changed
+  document.getElementById('game-id').addEventListener('input', (e) => {
+    const gameId = e.target.value.trim();
+    fetchAndDisplayGameInfo(gameId);
+  });
   document.getElementById('submit-move-btn').addEventListener('click', submitMove);
   document.getElementById('recall-tiles-btn').addEventListener('click', recallTiles);
   document.getElementById('exchange-tiles-btn').addEventListener('click', exchangeTilesClick);
@@ -2228,6 +2416,16 @@ document.addEventListener('DOMContentLoaded', () => {
       document.getElementById('vote-progress-dialog').style.display = 'none';
       currentVoteId = null;
     }
+  });
+
+  // Suggest end game dialog handlers
+  document.getElementById('confirm-end-game-btn').addEventListener('click', () => {
+    document.getElementById('suggest-end-game-dialog').style.display = 'none';
+    endGame(); // Trigger the end game function
+  });
+
+  document.getElementById('continue-game-btn').addEventListener('click', () => {
+    document.getElementById('suggest-end-game-dialog').style.display = 'none';
   });
 
   // Stop turn notification on any click in game screen
@@ -2398,6 +2596,17 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Rules menu buttons
+  document.querySelectorAll('#rules-menu-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.getElementById('rules-content').innerHTML = i18n.getRules();
+      document.getElementById('rules-dialog').style.display = 'flex';
+      document.querySelectorAll('#burger-dropdown').forEach(d => {
+        d.style.display = 'none';
+      });
+    });
+  });
+
   // Close dialog handlers
   document.querySelectorAll('.close-dialog').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -2432,8 +2641,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.getElementById('welcome-dialog').style.display = 'none';
 
-    // If game-created dialog is pending, show it now
-    if (pendingGameCreatedDialog) {
+    // If game-created dialog is pending (or if owner is rejoining), show it now
+    const isOwner = gameState && playerId === gameState.ownerId;
+    if (pendingGameCreatedDialog || isOwner) {
       document.getElementById('game-created-dialog').style.display = 'flex';
       pendingGameCreatedDialog = false;
     }

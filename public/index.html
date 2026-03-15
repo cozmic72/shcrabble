@@ -39,6 +39,19 @@
     </div>
   </div>
 
+  <!-- Rules Dialog -->
+  <div id="rules-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog dialog-large">
+      <div class="dialog-header">
+        <h2 data-i18n="rules">Rules</h2>
+        <button class="close-dialog" data-dialog="rules-dialog" aria-label="Close">×</button>
+      </div>
+      <div id="rules-content">
+        <!-- Loaded dynamically from i18n -->
+      </div>
+    </div>
+  </div>
+
   <!-- My Games Dialog -->
   <div id="my-games-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog">
@@ -140,6 +153,22 @@
     </div>
   </div>
 
+  <!-- Suggest End Game Dialog -->
+  <div id="suggest-end-game-dialog" class="dialog-overlay" style="display: none;">
+    <div class="dialog">
+      <div class="dialog-header">
+        <h2 data-i18n="suggestEndGameTitle">End Game?</h2>
+      </div>
+      <div class="dialog-content">
+        <p data-i18n="sixConsecutiveTurns">Six consecutive scoreless turns have occurred. Would you like to end the game now?</p>
+        <div style="display: flex; gap: 10px; margin-top: 20px;">
+          <button id="confirm-end-game-btn" class="primary-btn" data-i18n="endGameNow">End Game Now</button>
+          <button id="continue-game-btn" data-i18n="continueGame">Continue Playing</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Welcome Dialog -->
   <div id="welcome-dialog" class="dialog-overlay" style="display: none;">
     <div class="dialog dialog-large">
@@ -181,6 +210,19 @@
             <input type="checkbox" id="allow-voting" checked>
             <span>Allow voting on invalid words</span>
           </label>
+        </div>
+        <div class="setting-item">
+          <label data-i18n="rules">Rules</label>
+          <div style="display: flex; gap: 20px; margin-top: 5px;">
+            <label class="radio-label">
+              <input type="radio" name="game-rules" value="casual" checked>
+              <span data-i18n="casualRules">Casual (2-4 players)</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="game-rules" value="tournament">
+              <span data-i18n="tournamentRules">Tournament (2 players only)</span>
+            </label>
+          </div>
         </div>
         <div class="setting-item">
           <label>Tile Distribution</label>
@@ -257,6 +299,18 @@
           <label data-i18n="gameId">Game ID</label>
           <input type="text" id="game-id" placeholder="Game ID (or use link)">
         </div>
+
+        <!-- Game Configuration Summary (shown when available) -->
+        <div id="join-game-config-summary" style="display: none; background: #f5f5f5; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+          <h4 style="margin: 0 0 8px 0; font-size: 0.9em; color: #667eea;" data-i18n="gameConfiguration">Game Configuration</h4>
+          <ul style="margin: 0; padding-left: 20px; font-size: 0.85em; line-height: 1.6;">
+            <li><span data-i18n="rules">Rules</span>: <strong id="join-config-rules"></strong></li>
+            <li><span data-i18n="rackSize">Rack Size</span>: <strong id="join-config-rack-size"></strong></li>
+            <li><span data-i18n="tileDistribution">Tile Distribution</span>: <strong id="join-config-tile-dist"></strong> (<span id="join-config-total-tiles"></span> <span data-i18n="tiles">tiles</span>)</li>
+            <li><span data-i18n="votingAllowed">Voting Allowed</span>: <strong id="join-config-voting"></strong></li>
+          </ul>
+        </div>
+
         <div class="setting-item">
           <label data-i18n="joinAs">Join as</label>
           <div style="display: flex; gap: 20px; margin-top: 5px;">
@@ -285,6 +339,21 @@
         <button class="close-dialog" data-dialog="game-created-dialog" aria-label="Close">×</button>
       </div>
       <div class="dialog-content">
+        <div id="game-config-summary" style="background: #f5f5f5; padding: 15px; border-radius: 6px; margin-bottom: 15px;">
+          <h3 style="margin-top: 0; font-size: 1em; color: #667eea;" data-i18n="gameConfiguration">Game Configuration</h3>
+          <div style="display: grid; grid-template-columns: auto 1fr; gap: 8px 12px; font-size: 0.9em;">
+            <span data-i18n="rules">Rules:</span>
+            <strong id="config-rules"></strong>
+            <span data-i18n="rackSize">Rack Size:</span>
+            <strong id="config-rack-size"></strong>
+            <span data-i18n="tileDistribution">Tile Distribution:</span>
+            <strong id="config-tile-dist"></strong>
+            <span data-i18n="totalTiles">Total Tiles:</span>
+            <strong id="config-total-tiles"></strong>
+            <span data-i18n="votingAllowed">Voting Allowed:</span>
+            <strong id="config-voting"></strong>
+          </div>
+        </div>
         <p data-i18n="shareLink">Share this link with other players:</p>
         <div class="invite-link">
           <input type="text" id="invite-link" readonly>
@@ -303,6 +372,7 @@
         <button id="burger-btn" aria-label="Menu">☰</button>
         <div id="burger-dropdown" class="dropdown" style="display: none;">
           <button class="menu-item" id="my-games-menu-btn" data-i18n="myGames">My Games</button>
+          <button class="menu-item" id="rules-menu-btn" data-i18n="rulesMenu">Rules</button>
           <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
           <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
         </div>
@@ -325,6 +395,7 @@
         <button id="burger-btn" aria-label="Menu">☰</button>
         <div id="burger-dropdown" class="dropdown" style="display: none;">
           <button class="menu-item" id="my-games-menu-btn" data-i18n="myGames">My Games</button>
+          <button class="menu-item" id="rules-menu-btn" data-i18n="rulesMenu">Rules</button>
           <button class="menu-item" id="settings-menu-btn" data-i18n="settings">Settings</button>
           <button class="menu-item" id="about-menu-btn" data-i18n="about">About</button>
         </div>

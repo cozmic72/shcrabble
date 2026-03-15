@@ -77,6 +77,12 @@ app.get('/shcrabble/api/all-games', async (req, res) => {
       if (seenGameIds.has(row.id)) continue; // Already got this one from memory
 
       try {
+        // Skip if game_state is null
+        if (!row.game_state) {
+          console.log(`Skipping game ${row.id} in all-games - null game state`);
+          continue;
+        }
+
         const gameState = typeof row.game_state === 'string'
           ? JSON.parse(row.game_state)
           : row.game_state;
@@ -143,6 +149,12 @@ app.get('/shcrabble/api/my-games/:userId', async (req, res) => {
       if (seenGameIds.has(row.id)) continue; // Already got this one from memory
 
       try {
+        // Skip if game_state is null
+        if (!row.game_state) {
+          console.log(`Skipping game ${row.id} - null game state`);
+          continue;
+        }
+
         // Check if this game has the player
         // game_state might already be parsed by mysql2 driver
         const gameState = typeof row.game_state === 'string'
@@ -254,13 +266,49 @@ app.post('/shcrabble/api/delete-games', async (req, res) => {
   }
 });
 
+// Get game info (for join dialog)
+app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
+  try {
+    const gameId = req.params.gameId;
+
+    // Check memory first
+    let game = games.get(gameId);
+
+    // If not in memory, try database
+    if (!game) {
+      const rows = await db.query('SELECT game_state FROM sessions WHERE id = ?', [gameId]);
+      if (rows.length === 0 || !rows[0].game_state) {
+        return res.status(404).json({ error: 'Game not found' });
+      }
+
+      game = Game.deserialize(gameId, rows[0].game_state, dictionary);
+    }
+
+    // Return game configuration
+    res.json({
+      config: {
+        rackSize: game.rackSize,
+        allowVoting: game.allowVoting,
+        rules: game.rules,
+        customTiles: game.customTiles,
+        totalTiles: game.tiles ? game.tiles.reduce((sum, t) => sum + t.count, 0) : 100
+      },
+      playerCount: game.players.length,
+      status: game.status
+    });
+  } catch (err) {
+    console.error('Error fetching game info:', err);
+    res.status(500).json({ error: 'Failed to fetch game info' });
+  }
+});
+
 // Create new game
 app.post('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const { rackSize = 9, allowVoting = true, customTiles = null } = req.body;
+    const { rackSize = 9, allowVoting = true, rules = 'casual', customTiles = null } = req.body;
 
-    const game = new Game(gameId, dictionary, { rackSize, allowVoting, customTiles });
+    const game = new Game(gameId, dictionary, { rackSize, allowVoting, rules, customTiles });
 
     // Store in memory
     games.set(gameId, game);
@@ -534,6 +582,9 @@ io.on('connection', (socket) => {
       const score = game.calculateScore(placements);
       player.score += score;
 
+      // Reset consecutive scoreless turns (successful scoring move)
+      game.consecutiveScorelessTurns = 0;
+
       // Move to next turn
       game.nextTurn();
 
@@ -548,18 +599,49 @@ io.on('connection', (socket) => {
         [player.score, playerId]
       );
 
-      // Notify all players and spectators with personalized game state
-      const sockets = await io.in(gameId).fetchSockets();
-      for (const s of sockets) {
-        s.emit('game-update', {
-          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
-          lastMove: {
-            playerId,
-            playerName: player.name,
-            score,
-            placements
-          }
-        });
+      // Check if game should end (player used all tiles and bag is empty)
+      const playerWentOut = player.rack.length === 0;
+      const bagEmpty = game.tileBag.length === 0;
+
+      if (playerWentOut && bagEmpty) {
+        // Game is over - apply endgame scoring
+        game.applyEndgameScoring();
+        game.status = 'completed';
+
+        const finalScores = game.players.map(p => ({
+          name: p.name,
+          score: p.score
+        })).sort((a, b) => b.score - a.score);
+
+        // Notify all participants
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          s.emit('game-ended', {
+            finalScores
+          });
+        }
+
+        // Delete game from database
+        await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
+
+        // Remove from memory
+        games.delete(gameId);
+
+        console.log(`Game ${gameId} ended automatically (player went out)`);
+      } else {
+        // Game continues - notify all players and spectators with personalized game state
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          s.emit('game-update', {
+            gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
+            lastMove: {
+              playerId,
+              playerName: player.name,
+              score,
+              placements
+            }
+          });
+        }
       }
 
     } catch (err) {
@@ -700,24 +782,61 @@ io.on('connection', (socket) => {
             [player.score, vote.playerId]
           );
 
-          // Notify all players
-          const sockets = await io.in(gameId).fetchSockets();
-          for (const s of sockets) {
-            s.emit('vote-result', {
-              voteId,
-              accepted: true,
-              message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
-            });
+          // Check if game should end (player used all tiles and bag is empty)
+          const playerWentOut = player.rack.length === 0;
+          const bagEmpty = game.tileBag.length === 0;
 
-            s.emit('game-update', {
-              gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
-              lastMove: {
-                playerId: vote.playerId,
-                playerName: vote.playerName,
-                score: vote.score,
-                placements: vote.placements
-              }
-            });
+          if (playerWentOut && bagEmpty) {
+            // Game is over - apply endgame scoring
+            game.applyEndgameScoring();
+            game.status = 'completed';
+
+            const finalScores = game.players.map(p => ({
+              name: p.name,
+              score: p.score
+            })).sort((a, b) => b.score - a.score);
+
+            // Notify all participants
+            const sockets = await io.in(gameId).fetchSockets();
+            for (const s of sockets) {
+              s.emit('vote-result', {
+                voteId,
+                accepted: true,
+                message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
+              });
+
+              s.emit('game-ended', {
+                finalScores
+              });
+            }
+
+            // Delete game from database
+            await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
+
+            // Remove from memory
+            games.delete(gameId);
+
+            console.log(`Game ${gameId} ended automatically after vote (player went out)`);
+          } else {
+            // Game continues - notify all players
+            const sockets = await io.in(gameId).fetchSockets();
+            for (const s of sockets) {
+              s.emit('vote-result', {
+                voteId,
+                accepted: true,
+                message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
+              });
+
+              s.emit('game-update', {
+                gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
+                lastMove: {
+                  playerId: vote.playerId,
+                  playerName: vote.playerName,
+                  score: vote.score,
+                  placements: vote.placements
+                }
+              });
+            }
           }
         } else {
           // Reject the move
@@ -833,6 +952,9 @@ io.on('connection', (socket) => {
       // Exchange tiles
       game.exchangeTiles(player.index, indices);
 
+      // Increment consecutive scoreless turns
+      game.consecutiveScorelessTurns++;
+
       // Move to next turn
       game.nextTurn();
 
@@ -848,6 +970,17 @@ io.on('connection', (socket) => {
         s.emit('game-update', {
           gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
         });
+      }
+
+      // Check for six consecutive scoreless turns
+      if (game.consecutiveScorelessTurns >= 6) {
+        // Notify owner to decide if game should end
+        const ownerSocket = sockets.find(s => s.data.playerId === game.ownerId);
+        if (ownerSocket) {
+          ownerSocket.emit('suggest-end-game', {
+            reason: 'six-consecutive-scoreless-turns'
+          });
+        }
       }
 
       console.log(`Player ${player.name} exchanged ${indices.length} tiles`);
@@ -875,6 +1008,9 @@ io.on('connection', (socket) => {
         return;
       }
 
+      // Increment consecutive scoreless turns
+      game.consecutiveScorelessTurns++;
+
       game.nextTurn();
 
       await db.query(
@@ -888,6 +1024,17 @@ io.on('connection', (socket) => {
         s.emit('game-update', {
           gameState: game.getState(s.data.playerId)
         });
+      }
+
+      // Check for six consecutive scoreless turns
+      if (game.consecutiveScorelessTurns >= 6) {
+        // Notify owner to decide if game should end
+        const ownerSocket = sockets.find(s => s.data.playerId === game.ownerId);
+        if (ownerSocket) {
+          ownerSocket.emit('suggest-end-game', {
+            reason: 'six-consecutive-scoreless-turns'
+          });
+        }
       }
 
     } catch (err) {
@@ -914,12 +1061,14 @@ io.on('connection', (socket) => {
       }
 
       // Remove the player
-      const removedPlayer = game.removePlayer(targetPlayerId);
+      const result = game.removePlayer(targetPlayerId);
 
-      if (!removedPlayer) {
+      if (!result) {
         socket.emit('error', { message: 'Player not found' });
         return;
       }
+
+      const { player: removedPlayer, wasOwner, newOwner } = result;
 
       // Delete from database
       await db.query('DELETE FROM players WHERE id = ?', [targetPlayerId]);
@@ -943,6 +1092,14 @@ io.on('connection', (socket) => {
             playerName: removedPlayer.name,
             gameState: game.getState(s.data.playerId || null)
           });
+
+          // Notify about ownership transfer
+          if (wasOwner && newOwner) {
+            s.emit('ownership-transferred', {
+              newOwnerName: newOwner.name,
+              newOwnerId: newOwner.id
+            });
+          }
         }
       }
 
@@ -970,6 +1127,9 @@ io.on('connection', (socket) => {
         socket.emit('error', { message: 'Only the game owner can end the game' });
         return;
       }
+
+      // Apply endgame scoring adjustments
+      game.applyEndgameScoring();
 
       // Calculate final scores
       const finalScores = game.players.map(p => ({

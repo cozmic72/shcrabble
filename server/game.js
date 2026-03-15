@@ -34,7 +34,9 @@ class Game {
     this.dictionary = dictionary; // Reference to dictionary for word validation
     this.rackSize = options.rackSize || 9; // Customizable rack size
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
+    this.rules = options.rules || 'casual'; // 'casual' or 'tournament'
     this.customTiles = options.customTiles || null; // Custom tile distribution
+    this.consecutiveScorelessTurns = 0; // Track consecutive passes/exchanges for endgame
   }
 
   // Load tile definitions and metadata from CSV (without initializing tileBag)
@@ -224,6 +226,7 @@ class Game {
     if (index === -1) return null;
 
     const player = this.players[index];
+    const wasOwner = this.ownerId === playerId;
 
     // Return tiles to bag
     if (player.rack) {
@@ -238,6 +241,13 @@ class Game {
       p.index = idx;
     });
 
+    // Transfer ownership if the owner left
+    let newOwner = null;
+    if (wasOwner && this.players.length > 0) {
+      this.ownerId = this.players[0].id;
+      newOwner = this.players[0];
+    }
+
     // Adjust current player index if needed
     if (this.currentPlayerIndex >= this.players.length && this.players.length > 0) {
       this.currentPlayerIndex = 0;
@@ -249,7 +259,7 @@ class Game {
       this.locked = false;
     }
 
-    return player;
+    return { player, wasOwner, newOwner };
   }
 
   drawTiles(count) {
@@ -575,6 +585,47 @@ class Game {
     return score;
   }
 
+  // Apply endgame scoring adjustments
+  applyEndgameScoring() {
+    // Find player who went out (has no tiles left)
+    const playerWhoWentOut = this.players.find(p => p.rack.length === 0);
+
+    if (this.rules === 'tournament') {
+      // Tournament rules (2 players only): winner gets 2x opponent's remaining tiles
+      if (playerWhoWentOut && this.players.length === 2) {
+        const opponent = this.players.find(p => p.id !== playerWhoWentOut.id);
+        const opponentTileValue = opponent.rack.reduce((sum, tile) => sum + tile.points, 0);
+        playerWhoWentOut.score += opponentTileValue * 2;
+      } else {
+        // If no one went out, everyone subtracts their own tiles
+        this.players.forEach(player => {
+          const tileValue = player.rack.reduce((sum, tile) => sum + tile.points, 0);
+          player.score -= tileValue;
+        });
+      }
+    } else {
+      // Casual rules (2-4 players): standard Scrabble endgame scoring
+      if (playerWhoWentOut) {
+        // Player who went out gets sum of all other players' tiles
+        let totalOpponentTiles = 0;
+        this.players.forEach(player => {
+          const tileValue = player.rack.reduce((sum, tile) => sum + tile.points, 0);
+          if (player.id !== playerWhoWentOut.id) {
+            totalOpponentTiles += tileValue;
+            player.score -= tileValue; // Subtract from each opponent
+          }
+        });
+        playerWhoWentOut.score += totalOpponentTiles; // Add to winner
+      } else {
+        // No one went out - everyone subtracts their own tiles
+        this.players.forEach(player => {
+          const tileValue = player.rack.reduce((sum, tile) => sum + tile.points, 0);
+          player.score -= tileValue;
+        });
+      }
+    }
+  }
+
   nextTurn() {
     this.currentPlayerIndex = (this.currentPlayerIndex + 1) % this.players.length;
   }
@@ -608,7 +659,15 @@ class Game {
       status: this.status,
       locked: this.locked,
       ownerId: this.ownerId,
-      tilesRemaining: this.tileBag.length
+      tilesRemaining: this.tileBag.length,
+      // Game configuration
+      config: {
+        rackSize: this.rackSize,
+        allowVoting: this.allowVoting,
+        rules: this.rules,
+        customTiles: this.customTiles,
+        totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100
+      }
     };
   }
 
@@ -626,6 +685,8 @@ class Game {
       ownerId: this.ownerId,
       rackSize: this.rackSize,
       allowVoting: this.allowVoting,
+      rules: this.rules,
+      consecutiveScorelessTurns: this.consecutiveScorelessTurns,
       customTiles: this.customTiles
     });
   }
@@ -638,6 +699,7 @@ class Game {
     const options = {
       rackSize: state.rackSize || 9,
       allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
+      rules: state.rules || 'casual',
       customTiles: state.customTiles || null
     };
 
@@ -651,6 +713,7 @@ class Game {
     game.locked = state.locked || false;
     game.turnsTaken = state.turnsTaken || 0;
     game.ownerId = state.ownerId || null;
+    game.consecutiveScorelessTurns = state.consecutiveScorelessTurns || 0;
     game.loadTileInfo(); // Load tile definitions only (preserves tileBag)
     return game;
   }
