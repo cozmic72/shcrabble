@@ -91,5 +91,6 @@
   "defaultDist": "𐑛𐑦𐑓𐑷𐑤𐑑",
   "customDist": "𐑒𐑳𐑕𐑑𐑩𐑥",
   "youAreNowOwner": "𐑿 𐑸 𐑯𐑬 𐑞 𐑜𐑱𐑥 𐑴𐑯𐑼",
-  "ownershipTransferred": "𐑜𐑱𐑥 𐑴𐑯𐑼𐑖𐑦𐑐 𐑑𐑮𐑨𐑯𐑕𐑓𐑻𐑛 𐑑 {name}"
+  "ownershipTransferred": "𐑜𐑱𐑥 𐑴𐑯𐑼𐑖𐑦𐑐 𐑑𐑮𐑨𐑯𐑕𐑓𐑻𐑛 𐑑 {name}",
+  "rulesMenu": "𐑮𐑵𐑤𐑟"
 }
