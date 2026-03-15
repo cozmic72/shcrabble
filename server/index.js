@@ -582,8 +582,8 @@ io.on('connection', (socket) => {
 
           // Check if timer should be resumed (was auto-paused due to all players disconnecting)
           const anyConnected = game.players.some(p => p.connected);
-          if (game.timerEnabled && game.timerPaused && anyConnected) {
-            // Resume timer if it was auto-paused
+          if (game.timerPaused && anyConnected && game.status === 'active') {
+            // Resume timer if it was auto-paused (works for both timer-enabled and count-up games)
             game.resumeTimer();
             console.log(`Timer resumed in game ${gameId} - player reconnected`);
           }
@@ -1464,8 +1464,8 @@ io.on('connection', (socket) => {
 
           // Check if all players are now disconnected
           const allDisconnected = game.players.every(p => !p.connected);
-          if (allDisconnected && game.timerEnabled && !game.timerPaused) {
-            // Pause timer when all players disconnect
+          if (allDisconnected && !game.timerPaused && game.status === 'active') {
+            // Pause timer when all players disconnect (works for both timer-enabled and count-up games)
             game.pauseTimer();
             console.log(`Timer paused in game ${gameId} - all players disconnected`);
           }
