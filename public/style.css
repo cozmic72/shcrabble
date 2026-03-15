@@ -1005,3 +1005,156 @@ body {
   animation: turnFlash 2s ease-in-out infinite;
   border-radius: 8px;
 }
+
+/* Mobile Layout for portrait screens (phones) */
+@media (max-width: 768px) and (orientation: portrait) {
+  /* Adjust game container to stack vertically */
+  #game-container {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 0;
+  }
+
+  /* Move players to horizontal scrollable bar at top */
+  #players-panel {
+    order: -1;
+    width: 100%;
+    margin-bottom: 10px;
+  }
+
+  #players-panel h2 {
+    font-size: 1em;
+    margin-bottom: 8px;
+  }
+
+  #players-list {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 5px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+  }
+
+  .player-card {
+    flex: 0 0 140px;
+    padding: 10px;
+    margin-bottom: 0;
+    font-size: 0.85em;
+  }
+
+  .player-score {
+    font-size: 0.8em;
+  }
+
+  /* Make board container touch-zoomable */
+  #board-container {
+    width: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y pinch-zoom;
+    position: relative;
+  }
+
+  #board-container-zoom {
+    transform-origin: top left;
+    transition: transform 0.2s ease-out;
+  }
+
+  /* Scale board to fit width on mobile */
+  #board {
+    /* 15 squares * 32px + gaps */
+    grid-template-columns: repeat(15, 32px);
+    grid-template-rows: repeat(15, 32px);
+    margin: 0 auto;
+  }
+
+  .square {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2em;
+  }
+
+  .bonus-label {
+    font-size: 0.5em;
+  }
+
+  .tile-points {
+    font-size: 0.6em;
+  }
+
+  /* Rack container */
+  #rack-container {
+    width: 100%;
+    padding: 10px;
+  }
+
+  #rack-container h3 {
+    font-size: 1em;
+    margin-bottom: 8px;
+  }
+
+  #rack {
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .rack-tile {
+    width: 40px;
+    height: 40px;
+    font-size: 1.3em;
+  }
+
+  #move-controls {
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  #move-controls button {
+    flex: 1 1 auto;
+    min-width: 100px;
+    font-size: 0.85em;
+    padding: 8px 12px;
+  }
+
+  /* Adjust header for mobile */
+  #game-header {
+    flex-wrap: wrap;
+    padding: 10px;
+    gap: 10px;
+  }
+
+  #game-header h1 {
+    font-size: 1.2em;
+    flex: 1 1 100%;
+  }
+
+  #tiles-remaining {
+    font-size: 0.9em;
+  }
+
+  #game-info {
+    gap: 6px;
+  }
+
+  #game-info button {
+    font-size: 0.8em;
+    padding: 6px 10px;
+  }
+
+  /* Burger menu positioning */
+  #burger-menu {
+    top: 8px;
+    right: 8px;
+  }
+
+  #burger-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+}

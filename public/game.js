@@ -26,6 +26,14 @@ let touchClone = null;
 let touchStartPos = { x: 0, y: 0 };
 let touchCurrentTarget = null;
 
+// Pinch zoom support for board
+let boardScale = 1;
+let boardTranslateX = 0;
+let boardTranslateY = 0;
+let pinchStartDistance = 0;
+let pinchStartScale = 1;
+let isPinching = false;
+
 // All Shavian letters for blank tile selection
 // First 40 letters in Unicode order (4 rows of 10)
 const SHAVIAN_LETTERS = [
@@ -1005,6 +1013,9 @@ function handleDragEnd(e) {
 
 // Touch event handlers for mobile support
 function handleTouchStart(e) {
+  // Don't start drag if pinching
+  if (e.touches.length > 1 || isPinching) return;
+
   const tile = e.target.closest('.rack-tile');
   if (!tile) return;
 
@@ -1046,6 +1057,9 @@ function handleTouchStart(e) {
 }
 
 function handlePlacedTileTouchStart(e) {
+  // Don't start drag if pinching
+  if (e.touches.length > 1 || isPinching) return;
+
   const tile = e.target.closest('.placed-tile');
   if (!tile) return;
 
@@ -1204,6 +1218,52 @@ function handleTouchEnd(e) {
   touchCurrentTarget = null;
 
   e.preventDefault();
+}
+
+// Pinch zoom for board on mobile
+function setupBoardPinchZoom() {
+  const boardContainer = document.getElementById('board-container');
+  if (!boardContainer) return;
+
+  let initialTouches = [];
+
+  boardContainer.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+      isPinching = true;
+      initialTouches = Array.from(e.touches);
+      pinchStartDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+      pinchStartScale = boardScale;
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  boardContainer.addEventListener('touchmove', (e) => {
+    if (e.touches.length === 2 && isPinching) {
+      const currentDistance = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      );
+
+      boardScale = Math.max(0.5, Math.min(3, pinchStartScale * (currentDistance / pinchStartDistance)));
+
+      const board = document.getElementById('board');
+      if (board) {
+        board.style.transform = `scale(${boardScale})`;
+        board.style.transformOrigin = 'top left';
+      }
+
+      e.preventDefault();
+    }
+  }, { passive: false });
+
+  boardContainer.addEventListener('touchend', (e) => {
+    if (e.touches.length < 2) {
+      isPinching = false;
+    }
+  });
 }
 
 // Handle drag over rack for reordering
@@ -2084,6 +2144,9 @@ function showPlayerTiles(player) {
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
   initSocket();
+
+  // Setup mobile pinch zoom for board
+  setupBoardPinchZoom();
 
   // Check if joining via link
   const urlParams = new URLSearchParams(window.location.search);
