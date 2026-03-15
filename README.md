@@ -4,38 +4,61 @@ A multiplayer Scrabble game using the Shavian alphabet with real-time WebSocket 
 
 ## Features
 
-- 2-4 player multiplayer Scrabble
-- Real-time gameplay using WebSocket connections
-- Standard 15x15 Scrabble board with bonus squares
-- 42 Shavian letters (compound letters split) + blank tiles
-- Dictionary validation using the Readlex dictionary
-- Simple invite link system (no authentication required initially)
-- Score tracking and turn management
+### Gameplay
+- 2-4 player multiplayer with real-time WebSocket connections
+- Standard 15x15 Scrabble board with bonus squares (DW, TW, DL, TL)
+- Dictionary validation using Readlex (Shavian/English)
+- Spectator mode with rack viewing
+- Player reconnection support
+- Turn management with pass/exchange options
+- 50 point bonus for using all tiles in rack
+- Automatic game end suggestion after 6 consecutive scoreless turns
+
+### Game Modes
+- Casual rules (2-4 players)
+- Tournament rules (2 players only)
+- Configurable rack size (5-12 tiles, default 9)
+- Custom tile distributions
+- Compound letter mode (split vs. compound tiles)
+- Optional accumulative timer (default 25 minutes per player)
+  - Live countdown display
+  - Auto-pause on disconnect
+  - Owner pause/unpause control
+
+### Tile Options
+- Default: 42 Shavian letters split mode + blanks
+- Compound mode: Includes 𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿 as single tiles
+- Custom distributions via game creation
+
+### Voting System
+- Optional voting on word validity (casual mode default)
+- Players vote to accept/reject challenged words
+- Majority rule resolution
+
+### Administration
+- Game owner controls (remove players, end game, delete game, transfer ownership)
+- Invite link sharing
+- Persistent game state (reconnect to active games)
+
+### Internationalization
+- English and Shavian (𐑖𐑱𐑝𐑾𐑯) UI translations
+- Roman and Shavian script display modes
 
 ## Tech Stack
 
 - **Backend**: Node.js, Express, Socket.io
 - **Frontend**: Plain HTML/CSS/JavaScript
-- **Database**: MySQL
+- **Database**: SQLite3
 - **Dictionary**: Readlex (Shavian/English dictionary)
 
 ## Project Structure
 
 ```
 shcrabble/
-├── server/
-│   ├── index.js       # Main server & WebSocket handlers
-│   ├── game.js        # Game logic (board, tiles, scoring)
-│   ├── dictionary.js  # Dictionary processing & validation
-│   └── db.js          # MySQL database connection
-├── public/
-│   ├── index.html     # Game UI
-│   ├── style.css      # Styling
-│   └── game.js        # Client-side game logic
-├── data/
-│   └── tiles.csv      # Tile distribution & scores
-└── database/
-    └── schema.sql     # MySQL schema
+├── server/           # Server-side code (game logic, WebSocket handlers, database)
+├── public/           # Client-side code (UI, game client)
+├── data/             # Tile distributions (CSV)
+└── database/         # Database schema
 ```
 
 ## Setup Instructions
@@ -43,7 +66,6 @@ shcrabble/
 ### Prerequisites
 
 - Node.js (v14 or higher)
-- MySQL server
 - Readlex dictionary at `~/Code/shavian-info/readlex/readlex.json`
 
 ### Installation
@@ -53,40 +75,23 @@ shcrabble/
    npm install
    ```
 
-2. **Set up MySQL database**
-   ```bash
-   mysql -u root -p < database/schema.sql
-   ```
-
-3. **Configure environment** (optional)
-   ```bash
-   cp .env.example .env
-   # Edit .env with your MySQL credentials if needed
-   ```
-
-4. **Start the server**
+2. **Start the server**
    ```bash
    npm start
    ```
 
    The server will run on `http://localhost:3000`
+   Database will be created automatically at `shcrabble.db`
 
 ### Testing Locally
 
-1. Open your browser to `http://localhost:3000/shcrabble`
+1. Open `http://localhost:3000/shcrabble`
 2. Create a new game or join an existing one
 3. Share the invite link with other players
-4. Play!
 
 ## Apache Deployment
 
-To deploy under the `/shcrabble` subdirectory on your Apache server:
-
-### 1. Install and run the application
-
-Place the shcrabble directory in your desired location (e.g., `/var/www/shcrabble`)
-
-### 2. Run as a service using PM2 (recommended)
+### 1. Install and run as a service using PM2
 
 ```bash
 # Install PM2 globally
@@ -102,9 +107,7 @@ pm2 save
 pm2 startup
 ```
 
-### 3. Configure Apache as a reverse proxy
-
-Add this to your Apache configuration (e.g., in a virtual host or `.htaccess`):
+### 2. Configure Apache as a reverse proxy
 
 ```apache
 # Enable required modules (run as root)
@@ -126,73 +129,52 @@ systemctl restart apache2
 </Location>
 ```
 
-### 4. Alternative: Direct Apache configuration
-
-If you prefer not to use a reverse proxy, you can configure Apache to serve the static files directly and use a separate port for the WebSocket server. However, the reverse proxy method is simpler.
-
 ## Tile Distribution
 
-The tiles are defined in `data/tiles.csv`. The current distribution is a placeholder and should be updated with proper Shavian Scrabble scoring.
+Tiles are defined in `data/tiles.csv` and `data/tiles-compound.csv`.
 
-**Current tiles**: 42 Shavian letters + 2 blanks
+**Split mode (default)**: 42 Shavian letters + 2 blanks
+- Compound letters split: 𐑼→𐑩𐑮, 𐑽→𐑦𐑩𐑮, 𐑸→𐑭𐑮, 𐑹→𐑷𐑮, 𐑾→𐑦𐑩, 𐑿→𐑘𐑵
 
-**Compound letters** are split for gameplay:
-- 𐑽 → 𐑦𐑩𐑮
-- 𐑼 → 𐑩𐑮
-- 𐑸 → 𐑭𐑮
-- 𐑹 → 𐑷𐑮
-- 𐑾 → 𐑦𐑩
-- 𐑿 → 𐑘𐑵
+**Compound mode**: 48 Shavian letters + 2 blanks
+- Includes compound letters as single tiles
 
 ## Dictionary
 
-The game uses the Readlex dictionary located at `~/Code/shavian-info/readlex/readlex.json`.
+Uses Readlex dictionary at `~/Code/shavian-info/readlex/readlex.json`.
 
-Words are filtered to exclude:
+Filters out:
 - Single letters (POS tag: ZZ0)
 - Abbreviations (all caps, periods)
 - Unclassified words (POS tag: UNC)
 
-Compound letters in the dictionary are automatically split during validation.
+Compound letters in dictionary are automatically normalized based on game mode.
 
 ## Game Rules
 
-Standard Scrabble rules apply:
+Standard Scrabble rules:
 - 15x15 board
-- 7 tiles per player
-- 2-4 players
-- Standard bonus squares (DW, TW, DL, TL)
-- 50 point bonus for using all 7 tiles
+- Configurable rack size (default 9 tiles for Shavian)
+- 2-4 players (casual) or 2 players (tournament)
+- Standard bonus squares
+- 50 point bonus for using all rack tiles
 - First word must cover center square
+- Optional timer: accumulative time bank per player
 
 ## Development
 
-### Running tests
-```bash
-# Test dictionary loading
-node server/test-dictionary.js
-```
-
 ### Environment Variables
 
-See `.env.example` for available configuration options:
-- `PORT`: Server port (default: 3000)
-- `DB_HOST`: MySQL host (default: localhost)
-- `DB_USER`: MySQL user (default: root)
-- `DB_PASSWORD`: MySQL password
-- `DB_NAME`: Database name (default: shcrabble)
+Create `.env` file with:
+```
+PORT=3000
+DICT_PATH=/path/to/readlex.json
+```
 
-## Future Enhancements
-
-- [ ] User authentication and persistent profiles
-- [ ] Game history and statistics
-- [ ] AI opponent for single-player mode
-- [ ] Turn timer option
-- [ ] Chat system
-- [ ] Proper Shavian tile scoring and distribution
-- [ ] Word validation feedback
-- [ ] Improved drag-and-drop interface
-- [ ] Mobile-responsive design
+Defaults:
+- Port: 3000
+- Dictionary: `~/Code/shavian-info/readlex/readlex.json`
+- Database: `./shcrabble.db` (SQLite)
 
 ## License
 
