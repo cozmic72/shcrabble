@@ -624,6 +624,13 @@ body {
   border-left-color: #999;
 }
 
+.player-card.left-game {
+  opacity: 0.5;
+  background: #fafafa;
+  border-left-color: #bbb;
+  text-decoration: line-through;
+}
+
 .player-card.spectator {
   background: #e3f2fd;
   border-left-color: #2196f3;

@@ -150,7 +150,8 @@ class Game {
       score: 0,
       rack: this.drawTiles(this.rackSize),
       index: this.players.length,
-      connected: true
+      connected: true,
+      hasLeft: false
     };
 
     this.players.push(player);
@@ -218,6 +219,42 @@ class Game {
       return true;
     }
     return false;
+  }
+
+  // Mark player as having left (keeps them in game for scoring)
+  markPlayerAsLeft(playerId) {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) return null;
+
+    player.hasLeft = true;
+    player.connected = false;
+
+    const wasOwner = this.ownerId === playerId;
+
+    // Transfer ownership if the owner left
+    let newOwner = null;
+    if (wasOwner) {
+      // Find first player who hasn't left
+      const remainingPlayer = this.players.find(p => !p.hasLeft);
+      if (remainingPlayer) {
+        this.ownerId = remainingPlayer.id;
+        newOwner = remainingPlayer;
+      }
+    }
+
+    // Check if we need to skip to next player's turn
+    const needsSkip = this.currentPlayerIndex === player.index;
+
+    // Count active (non-left) players
+    const activePlayers = this.players.filter(p => !p.hasLeft);
+
+    // If less than 2 active players, set back to waiting
+    if (activePlayers.length < 2) {
+      this.status = 'waiting';
+      this.locked = false;
+    }
+
+    return { player, wasOwner, newOwner, needsSkip };
   }
 
   // Remove player completely (by owner)

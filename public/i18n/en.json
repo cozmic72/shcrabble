@@ -68,6 +68,7 @@
   "spectatorJoined": "{name} joined as spectator",
   "spectatorLeft": "{name} left",
   "playerRemoved": "{name} was removed from the game",
+  "playerLeft": "{name} left the game",
   "confirmRemovePlayer": "Remove this player from the game?",
   "enterYourName": "Please enter your name",
   "enterGameId": "Please enter a game ID",

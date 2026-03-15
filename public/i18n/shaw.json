@@ -68,6 +68,7 @@
   "spectatorJoined": "{name} 𐑡𐑶𐑯𐑛 𐑨𐑟 𐑕𐑐𐑧𐑒𐑑𐑱𐑑𐑼",
   "spectatorLeft": "{name} 𐑤𐑧𐑓𐑑",
   "playerRemoved": "{name} 𐑢𐑪𐑟 𐑮𐑦𐑥𐑵𐑝𐑛 𐑓𐑮𐑪𐑥 𐑞 𐑜𐑱𐑥",
+  "playerLeft": "{name} 𐑤𐑧𐑓𐑑 𐑞 𐑜𐑱𐑥",
   "confirmRemovePlayer": "𐑮𐑦𐑥𐑵𐑝 𐑞𐑦𐑕 𐑐𐑤𐑱𐑼 𐑓𐑮𐑪𐑥 𐑞 𐑜𐑱𐑥?",
   "enterYourName": "𐑐𐑤𐑰𐑟 𐑧𐑯𐑑𐑼 𐑿𐑮 𐑯𐑱𐑥",
   "enterGameId": "𐑐𐑤𐑰𐑟 𐑧𐑯𐑑𐑼 𐑩 𐑜𐑱𐑥 𐑲𐑛𐑰",

@@ -365,6 +365,12 @@ io.on('connection', (socket) => {
       const existingSpectator = game.spectators.find(s => s.name.toLowerCase() === playerName.toLowerCase());
 
       if (existingPlayer) {
+        // Check if player has left - prevent rejoin
+        if (existingPlayer.hasLeft) {
+          socket.emit('error', { message: 'You have left this game and cannot rejoin. Your score will remain in the game.' });
+          return;
+        }
+
         // Reconnect existing player with new ID
         const playerId = uuidv4();
         const player = game.reconnectPlayer(playerId, playerName);
@@ -1054,56 +1060,104 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Check if requester is the owner or admin
-      if (!isAdmin && game.ownerId !== playerId) {
-        socket.emit('error', { message: 'Only the game owner can remove players' });
-        return;
-      }
+      const isLeavingSelf = targetPlayerId === playerId;
 
-      // Remove the player
-      const result = game.removePlayer(targetPlayerId);
+      // If player is leaving themselves, mark as left (keep in game for scoring)
+      if (isLeavingSelf) {
+        const result = game.markPlayerAsLeft(targetPlayerId);
 
-      if (!result) {
-        socket.emit('error', { message: 'Player not found' });
-        return;
-      }
+        if (!result) {
+          socket.emit('error', { message: 'Player not found' });
+          return;
+        }
 
-      const { player: removedPlayer, wasOwner, newOwner } = result;
+        const { player: leftPlayer, wasOwner, newOwner, needsSkip } = result;
 
-      // Delete from database
-      await db.query('DELETE FROM players WHERE id = ?', [targetPlayerId]);
+        // Update game state in database
+        await db.query(
+          'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
+          [game.serialize(), game.status, gameId]
+        );
 
-      // Update game state
-      await db.query(
-        'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
-        [game.serialize(), game.status, gameId]
-      );
-
-      // Notify all participants
-      const sockets = await io.in(gameId).fetchSockets();
-      for (const s of sockets) {
-        if (s.data.playerId === targetPlayerId) {
-          s.emit('removed-from-game', {
-            message: 'You have been removed from the game by the owner'
-          });
-          s.leave(gameId);
-        } else {
-          s.emit('player-removed', {
-            playerName: removedPlayer.name,
-            gameState: game.getState(s.data.playerId || null)
-          });
-
-          // Notify about ownership transfer
-          if (wasOwner && newOwner) {
-            s.emit('ownership-transferred', {
-              newOwnerName: newOwner.name,
-              newOwnerId: newOwner.id
+        // Notify all participants
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          if (s.data.playerId === targetPlayerId) {
+            s.emit('left-game', {
+              message: 'You have left the game. Your score will remain but you cannot rejoin.'
             });
+            s.leave(gameId);
+          } else {
+            s.emit('player-left', {
+              playerName: leftPlayer.name,
+              gameState: game.getState(s.data.playerId || null)
+            });
+
+            // Notify about ownership transfer
+            if (wasOwner && newOwner) {
+              s.emit('ownership-transferred', {
+                newOwnerName: newOwner.name,
+                newOwnerId: newOwner.id
+              });
+            }
           }
         }
-      }
 
-      console.log(`Player ${removedPlayer.name} removed from game ${gameId} by owner`);
+        console.log(`Player ${leftPlayer.name} left game ${gameId}`);
+
+      } else {
+        // Owner removing another player - remove completely
+        // Check if requester is the owner or admin
+        if (!isAdmin && game.ownerId !== playerId) {
+          socket.emit('error', { message: 'Only the game owner can remove players' });
+          return;
+        }
+
+        // Remove the player
+        const result = game.removePlayer(targetPlayerId);
+
+        if (!result) {
+          socket.emit('error', { message: 'Player not found' });
+          return;
+        }
+
+        const { player: removedPlayer, wasOwner, newOwner } = result;
+
+        // Delete from database
+        await db.query('DELETE FROM players WHERE id = ?', [targetPlayerId]);
+
+        // Update game state
+        await db.query(
+          'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
+          [game.serialize(), game.status, gameId]
+        );
+
+        // Notify all participants
+        const sockets = await io.in(gameId).fetchSockets();
+        for (const s of sockets) {
+          if (s.data.playerId === targetPlayerId) {
+            s.emit('removed-from-game', {
+              message: 'You have been removed from the game by the owner'
+            });
+            s.leave(gameId);
+          } else {
+            s.emit('player-removed', {
+              playerName: removedPlayer.name,
+              gameState: game.getState(s.data.playerId || null)
+            });
+
+            // Notify about ownership transfer
+            if (wasOwner && newOwner) {
+              s.emit('ownership-transferred', {
+                newOwnerName: newOwner.name,
+                newOwnerId: newOwner.id
+              });
+            }
+          }
+        }
+
+        console.log(`Player ${removedPlayer.name} removed from game ${gameId} by owner`);
+      }
 
     } catch (err) {
       console.error('Error removing player:', err);

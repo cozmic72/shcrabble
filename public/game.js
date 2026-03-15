@@ -393,6 +393,18 @@ function initSocket() {
     window.location.reload();
   });
 
+  socket.on('player-left', (data) => {
+    showMessage(i18n.t('playerLeft', { name: data.playerName }), 'info');
+    gameState = data.gameState;
+    updatePlayersList();
+    updateBoard();
+  });
+
+  socket.on('left-game', (data) => {
+    alert(data.message);
+    window.location.reload();
+  });
+
   socket.on('ownership-transferred', (data) => {
     // Update game state to reflect new owner
     if (gameState) {
@@ -625,20 +637,24 @@ function updatePlayersList() {
       card.classList.add('disconnected');
     }
 
+    if (player.hasLeft) {
+      card.classList.add('left-game');
+    }
+
     const scoreLabel = i18n.t('score');
     const tilesLabel = i18n.t('tiles');
-    const disconnectedLabel = player.connected ? '' : ' (disconnected)';
+    const statusLabel = player.hasLeft ? ' (left)' : (player.connected ? '' : ' (disconnected)');
     const isOwner = player.id === gameState.ownerId ? ' 👑' : '';
     const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
     const isGameOwner = gameState.ownerId === playerId;
-    const canRemove = (isGameOwner || isAdmin) && player.id !== playerId;
+    const canRemove = (isGameOwner || isAdmin) && player.id !== playerId && !player.hasLeft;
     console.log(`Player ${player.name}: ownerId=${gameState.ownerId}, myId=${playerId}, isAdmin=${isAdmin}, canRemove=${canRemove}`);
     const removeBtn = canRemove
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
 
     card.innerHTML = `
-      <div class="player-name">${player.name}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${disconnectedLabel}</div>
+      <div class="player-name">${player.name}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${statusLabel}</div>
       <div class="player-score">${scoreLabel}: ${player.score}</div>
       <div class="player-score">${tilesLabel}: ${player.rackCount}</div>
       ${removeBtn}
