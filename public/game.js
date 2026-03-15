@@ -3,6 +3,7 @@ let socket = null;
 let gameState = null;
 let playerId = null;
 let playerIndex = null;
+let isReconnection = false;
 let currentPlacements = [];
 let draggedTile = null;
 let draggedFromRack = false;
@@ -246,11 +247,13 @@ function initSocket() {
 
     // Show welcome dialog on first visit
     const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
+    isReconnection = data.reconnected || false;
+
     if (!hideWelcome) {
       document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
       document.getElementById('welcome-dialog').style.display = 'flex';
-    } else if (isOwner) {
-      // Always show game-created dialog for owner (after welcome if not hidden)
+    } else if (isOwner && !isReconnection) {
+      // Only show game-created dialog for owner when first creating, not when reconnecting
       document.getElementById('game-created-dialog').style.display = 'flex';
       pendingGameCreatedDialog = false;
     }
@@ -2657,9 +2660,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     document.getElementById('welcome-dialog').style.display = 'none';
 
-    // If game-created dialog is pending (or if owner is rejoining), show it now
+    // If game-created dialog is pending, show it now (but not for reconnections)
     const isOwner = gameState && playerId === gameState.ownerId;
-    if (pendingGameCreatedDialog || isOwner) {
+    if (pendingGameCreatedDialog || (isOwner && !isReconnection)) {
       document.getElementById('game-created-dialog').style.display = 'flex';
       pendingGameCreatedDialog = false;
     }
