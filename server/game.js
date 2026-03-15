@@ -42,7 +42,7 @@ class Game {
     // Timer settings
     this.timerEnabled = options.timerEnabled || false; // Whether timer is enabled
     this.timeLimit = options.timeLimit || 25 * 60; // Time limit per player in seconds (default 25 minutes)
-    this.timerPaused = false; // Whether timer is paused
+    this.timerPaused = this.timerEnabled; // Start paused if timer is enabled (owner must unpause)
     this.turnStartTime = null; // Timestamp when current turn started
   }
 

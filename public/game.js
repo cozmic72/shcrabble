@@ -2314,8 +2314,7 @@ async function deleteGame() {
 }
 
 function togglePauseTimer() {
-  const isPaused = gameState.timer?.paused || false;
-  socket.emit('toggle-pause-timer', { pause: !isPaused });
+  socket.emit('toggle-timer-pause');
 }
 
 function hideGameControls() {

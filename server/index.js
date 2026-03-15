@@ -1301,6 +1301,57 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Toggle timer pause/unpause
+  socket.on('toggle-timer-pause', async () => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      if (!game.timerEnabled) {
+        socket.emit('error', { message: 'Timer is not enabled for this game' });
+        return;
+      }
+
+      // Only owner can pause/unpause
+      if (game.ownerId !== playerId) {
+        socket.emit('error', { message: 'Only the game owner can pause/unpause the timer' });
+        return;
+      }
+
+      // Toggle pause state
+      if (game.timerPaused) {
+        game.resumeTimer();
+      } else {
+        game.pauseTimer();
+      }
+
+      // Update database
+      await db.query(
+        'UPDATE sessions SET game_state = ? WHERE id = ?',
+        [game.serialize(), gameId]
+      );
+
+      // Notify all players
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('timer-toggled', {
+          paused: game.timerPaused
+        });
+        s.emit('game-update', {
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+        });
+      }
+    } catch (err) {
+      console.error('Error toggling timer:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
   socket.on('end-game', async ({ isAdmin = false } = {}) => {
     try {
       const { gameId, playerId } = socket.data;
