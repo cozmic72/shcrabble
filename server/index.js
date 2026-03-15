@@ -366,62 +366,64 @@ io.on('connection', (socket) => {
       const existingSpectator = game.spectators.find(s => s.name.toLowerCase() === playerName.toLowerCase());
 
       if (existingPlayer) {
-        // Check if player has left - prevent rejoin
+        // Check if player has left - allow them to rejoin as spectator instead
         if (existingPlayer.hasLeft) {
-          socket.emit('error', { message: 'You have left this game and cannot rejoin. Your score will remain in the game.' });
-          return;
-        }
+          console.log(`Player ${playerName} has left, allowing them to rejoin as spectator`);
+          // Force them to join as spectator by setting asSpectator to true
+          asSpectator = true;
+          // Continue to spectator join logic below (don't return here)
+        } else {
+          // Reconnect existing player with new ID
+          const playerId = uuidv4();
+          const player = game.reconnectPlayer(playerId, playerName);
 
-        // Reconnect existing player with new ID
-        const playerId = uuidv4();
-        const player = game.reconnectPlayer(playerId, playerName);
-
-        if (!player) {
-          socket.emit('error', { message: 'Failed to reconnect' });
-          return;
-        }
-
-        console.log(`Player ${playerName} reconnected with new ID ${playerId}, ownerId is ${game.ownerId}`);
-
-        // Update player ID in database
-        await db.query(
-          'UPDATE players SET id = ? WHERE session_id = ? AND player_name = ?',
-          [playerId, gameId, playerName]
-        );
-
-        // Update game state
-        await db.query(
-          'UPDATE sessions SET game_state = ? WHERE id = ?',
-          [game.serialize(), gameId]
-        );
-
-        // Join socket room
-        socket.join(gameId);
-        socket.data.gameId = gameId;
-        socket.data.playerId = playerId;
-        socket.data.isSpectator = false;
-
-        // Send rejoin confirmation
-        socket.emit('joined', {
-          playerId,
-          playerIndex: player.index,
-          gameState: game.getState(playerId),
-          reconnected: true
-        });
-
-        // Notify others of reconnection
-        const sockets = await io.in(gameId).fetchSockets();
-        for (const s of sockets) {
-          if (s.id !== socket.id) {
-            s.emit('player-reconnected', {
-              playerName: player.name,
-              gameState: game.getState(s.data.playerId)
-            });
+          if (!player) {
+            socket.emit('error', { message: 'Failed to reconnect' });
+            return;
           }
-        }
 
-        console.log(`Player ${playerName} reconnected to game ${gameId}`);
-        return;
+          console.log(`Player ${playerName} reconnected with new ID ${playerId}, ownerId is ${game.ownerId}`);
+
+          // Update player ID in database
+          await db.query(
+            'UPDATE players SET id = ? WHERE session_id = ? AND player_name = ?',
+            [playerId, gameId, playerName]
+          );
+
+          // Update game state
+          await db.query(
+            'UPDATE sessions SET game_state = ? WHERE id = ?',
+            [game.serialize(), gameId]
+          );
+
+          // Join socket room
+          socket.join(gameId);
+          socket.data.gameId = gameId;
+          socket.data.playerId = playerId;
+          socket.data.isSpectator = false;
+
+          // Send rejoin confirmation
+          socket.emit('joined', {
+            playerId,
+            playerIndex: player.index,
+            gameState: game.getState(playerId),
+            reconnected: true
+          });
+
+          // Notify others of reconnection
+          const sockets = await io.in(gameId).fetchSockets();
+          for (const s of sockets) {
+            if (s.id !== socket.id) {
+              s.emit('player-reconnected', {
+                playerName: player.name,
+                gameState: game.getState(s.data.playerId)
+              });
+            }
+          }
+
+          console.log(`Player ${playerName} reconnected to game ${gameId}`);
+          return;
+        }
       }
 
       if (existingSpectator) {
