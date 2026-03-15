@@ -691,22 +691,33 @@ class Game {
       const currentPlayer = this.players[this.currentPlayerIndex];
       if (currentPlayer) {
         currentPlayer.timeUsed += elapsed;
+
+        // Check if player has run out of time (only if timer is enabled)
+        if (this.timerEnabled && currentPlayer.timeUsed >= this.timeLimit) {
+          this.endGameByTimeout();
+        }
       }
       this.turnStartTime = null;
     }
   }
 
-  // Pause the timer
-  pauseTimer() {
-    if (this.timerEnabled) {
-      this.stopTurnTimer(); // Save current elapsed time
-      this.timerPaused = true;
-    }
+  // End game when a player runs out of time
+  endGameByTimeout() {
+    this.status = 'completed';
+    this.timerPaused = true;
+    this.turnStartTime = null;
+    // Final scores are already calculated based on current scores
   }
 
-  // Resume the timer
+  // Pause the timer (works for both timer-enabled and count-up games)
+  pauseTimer() {
+    this.stopTurnTimer(); // Save current elapsed time
+    this.timerPaused = true;
+  }
+
+  // Resume the timer (works for both timer-enabled and count-up games)
   resumeTimer() {
-    if (this.timerEnabled && this.timerPaused) {
+    if (this.timerPaused) {
       this.timerPaused = false;
       this.startTurnTimer(); // Restart timer for current turn
     }

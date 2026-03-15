@@ -663,10 +663,10 @@ function updateGameUI() {
     deleteGameBtn.style.display = 'none';
   }
 
-  // Show/hide pause timer button for owner (only if timer enabled and game active)
+  // Show/hide pause timer button for owner (for all games with clock display)
   const pauseTimerBtn = document.getElementById('pause-timer-btn');
-  const timerEnabled = gameState.config?.timerEnabled || false;
-  if ((isOwner || isAdmin) && timerEnabled && !isCompleted) {
+  const showClock = localStorage.getItem('shcrabble-showClock') !== 'false';
+  if ((isOwner || isAdmin) && showClock && !isCompleted && gameState.status === 'active') {
     pauseTimerBtn.style.display = 'inline-block';
     const isPaused = gameState.timer?.paused || false;
     pauseTimerBtn.textContent = isPaused ? i18n.t('resumeTimer') : i18n.t('pauseTimer');
