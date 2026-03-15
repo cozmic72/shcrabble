@@ -2214,6 +2214,8 @@ async function showMyGamesDialog(showAllGames = false) {
         document.getElementById('my-games-dialog').style.display = 'none';
         document.getElementById('game-id').value = game.id;
         document.getElementById('join-name').value = getUserName();
+        // Fetch and display game info
+        fetchAndDisplayGameInfo(game.id);
         document.getElementById('join-game-dialog').style.display = 'flex';
       });
 
@@ -2352,36 +2354,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if joining via link
   const urlParams = new URLSearchParams(window.location.search);
   if (urlParams.has('game')) {
-    const gameId = urlParams.get('game');
-    const savedName = getUserName();
-    const userId = getUserId();
-
-    // Check if this might be a reconnection by trying to fetch game state
-    if (savedName && userId) {
-      fetch(`/shcrabble/api/check-player?gameId=${encodeURIComponent(gameId)}&userId=${encodeURIComponent(userId)}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.isPlayer) {
-            // User is already in this game, auto-reconnect
-            socket.emit('join-game', {
-              gameId,
-              playerName: savedName,
-              userId,
-              asSpectator: false
-            });
-          } else {
-            // Not in game yet, show dialog for role selection
-            showJoinGameDialog();
-          }
-        })
-        .catch(() => {
-          // On error, show dialog
-          showJoinGameDialog();
-        });
-    } else {
-      // No saved credentials, show dialog
-      showJoinGameDialog();
-    }
+    // Always show the join-game dialog with game info
+    showJoinGameDialog();
   }
 
   // Event listeners for lobby buttons
