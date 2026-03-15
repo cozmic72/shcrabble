@@ -3,6 +3,7 @@ let socket = null;
 let gameState = null;
 let playerId = null;
 let playerIndex = null;
+let timerUpdateInterval = null;
 let isReconnection = false;
 let currentPlacements = [];
 let draggedTile = null;
@@ -226,6 +227,7 @@ function initSocket() {
     showGameScreen();
 
     updateGameUI();
+    startTimerUpdates();
 
     // Check if this player is the game owner
     const isOwner = playerId === gameState.ownerId;
@@ -274,6 +276,9 @@ function initSocket() {
     const previousTurnIndex = gameState?.currentPlayerIndex;
 
     gameState = data.gameState;
+
+    // Restart timer updates if timer config changed
+    startTimerUpdates();
 
     // Restore local rack order if the rack contents haven't changed
     if (previousRackOrder) {
@@ -658,6 +663,18 @@ function updateGameUI() {
     deleteGameBtn.style.display = 'none';
   }
 
+  // Show/hide pause timer button for owner (only if timer enabled and game active)
+  const pauseTimerBtn = document.getElementById('pause-timer-btn');
+  const timerEnabled = gameState.config?.timerEnabled || false;
+  if ((isOwner || isAdmin) && timerEnabled && !isCompleted) {
+    pauseTimerBtn.style.display = 'inline-block';
+    const isPaused = gameState.timer?.paused || false;
+    pauseTimerBtn.textContent = isPaused ? i18n.t('resumeTimer') : i18n.t('pauseTimer');
+    pauseTimerBtn.setAttribute('data-i18n', isPaused ? 'resumeTimer' : 'pauseTimer');
+  } else {
+    pauseTimerBtn.style.display = 'none';
+  }
+
   // Hide leave game button for spectators (they should use Main Menu)
   const leaveGameBtn = document.getElementById('leave-game-btn');
   if (playerIndex === null) {
@@ -672,6 +689,34 @@ function formatTime(seconds) {
   const mins = Math.floor(seconds / 60);
   const secs = seconds % 60;
   return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Start timer update interval for live countdown
+function startTimerUpdates() {
+  // Clear any existing interval
+  if (timerUpdateInterval) {
+    clearInterval(timerUpdateInterval);
+  }
+
+  // Only start if timer is enabled
+  if (!gameState?.config?.timerEnabled) {
+    return;
+  }
+
+  // Update every second
+  timerUpdateInterval = setInterval(() => {
+    if (gameState?.config?.timerEnabled && !gameState?.timer?.paused) {
+      updatePlayersList(); // Refresh player cards to show updated times
+    }
+  }, 1000);
+}
+
+// Stop timer updates
+function stopTimerUpdates() {
+  if (timerUpdateInterval) {
+    clearInterval(timerUpdateInterval);
+    timerUpdateInterval = null;
+  }
 }
 
 function updatePlayersList() {
@@ -2231,6 +2276,8 @@ function leaveGame() {
 }
 
 function goToMainMenu() {
+  // Stop timer updates before leaving
+  stopTimerUpdates();
   // Just navigate without leaving the game (clear URL to prevent auto-rejoin)
   window.location.assign('/shcrabble/');
 }
@@ -2264,6 +2311,11 @@ async function deleteGame() {
     console.error('Error deleting game:', err);
     alert(i18n.t('failedDeleteGame'));
   }
+}
+
+function togglePauseTimer() {
+  const isPaused = gameState.timer?.paused || false;
+  socket.emit('toggle-pause-timer', { pause: !isPaused });
 }
 
 function hideGameControls() {
@@ -2569,6 +2621,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('leave-game-btn').addEventListener('click', leaveGame);
   document.getElementById('end-game-btn').addEventListener('click', endGame);
   document.getElementById('delete-game-btn').addEventListener('click', deleteGame);
+  document.getElementById('pause-timer-btn').addEventListener('click', togglePauseTimer);
 
   // Vote button handlers
   document.getElementById('vote-accept-btn').addEventListener('click', () => {

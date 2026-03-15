@@ -580,6 +580,14 @@ io.on('connection', (socket) => {
           socket.data.playerId = playerId;
           socket.data.isSpectator = false;
 
+          // Check if timer should be resumed (was auto-paused due to all players disconnecting)
+          const anyConnected = game.players.some(p => p.connected);
+          if (game.timerEnabled && game.timerPaused && anyConnected) {
+            // Resume timer if it was auto-paused
+            game.resumeTimer();
+            console.log(`Timer resumed in game ${gameId} - player reconnected`);
+          }
+
           // Send rejoin confirmation
           socket.emit('joined', {
             playerId,
@@ -1243,6 +1251,56 @@ io.on('connection', (socket) => {
   });
 
   // Owner: End game
+  // Toggle pause/resume timer
+  socket.on('toggle-pause-timer', async ({ pause }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      // Only owner can pause/resume timer
+      if (game.ownerId !== playerId) {
+        socket.emit('error', { message: 'Only the game owner can pause/resume the timer' });
+        return;
+      }
+
+      if (!game.timerEnabled) {
+        socket.emit('error', { message: 'Timer is not enabled for this game' });
+        return;
+      }
+
+      // Toggle timer state
+      if (pause) {
+        game.pauseTimer();
+      } else {
+        game.resumeTimer();
+      }
+
+      // Update database
+      await db.query(
+        'UPDATE sessions SET game_state = ? WHERE id = ?',
+        [game.serialize(), gameId]
+      );
+
+      // Notify all players of timer state change
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('game-update', {
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+        });
+      }
+
+      console.log(`Timer ${pause ? 'paused' : 'resumed'} in game ${gameId} by ${playerId}`);
+    } catch (err) {
+      console.error('Error toggling timer:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
   socket.on('end-game', async ({ isAdmin = false } = {}) => {
     try {
       const { gameId, playerId } = socket.data;
@@ -1352,6 +1410,14 @@ io.on('connection', (socket) => {
         if (disconnected) {
           const player = game.players.find(p => p.id === playerId);
           console.log(`Player ${player.name} disconnected from game ${gameId}`);
+
+          // Check if all players are now disconnected
+          const allDisconnected = game.players.every(p => !p.connected);
+          if (allDisconnected && game.timerEnabled && !game.timerPaused) {
+            // Pause timer when all players disconnect
+            game.pauseTimer();
+            console.log(`Timer paused in game ${gameId} - all players disconnected`);
+          }
 
           // Notify remaining participants
           const sockets = await io.in(gameId).fetchSockets();

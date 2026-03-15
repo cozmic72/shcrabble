@@ -100,5 +100,11 @@
   "deleteGame": "𐑛𐑦𐑤𐑰𐑑 𐑜𐑱𐑥",
   "confirmDeleteGame": "𐑛𐑦𐑤𐑰𐑑 𐑞𐑦𐑕 𐑜𐑱𐑥 𐑐𐑻𐑥𐑩𐑯𐑩𐑯𐑑𐑤𐑦? 𐑞𐑦𐑕 𐑒𐑨𐑯𐑪𐑑 𐑚𐑰 𐑳𐑯𐑛𐑳𐑯.",
   "gameDeleted": "𐑜𐑱𐑥 𐑛𐑦𐑤𐑰𐑑𐑩𐑛 𐑕𐑩𐑒𐑕𐑧𐑕𐑓𐑩𐑤𐑦",
-  "failedDeleteGame": "𐑓𐑱𐑤𐑛 𐑑 𐑛𐑦𐑤𐑰𐑑 𐑜𐑱𐑥"
+  "failedDeleteGame": "𐑓𐑱𐑤𐑛 𐑑 𐑛𐑦𐑤𐑰𐑑 𐑜𐑱𐑥",
+  "enableTimer": "𐑦𐑯𐑱𐑚𐑩𐑤 𐑑𐑲𐑥𐑼",
+  "timeLimitPerPlayer": "𐑑𐑲𐑥 𐑤𐑦𐑥𐑦𐑑 𐑐𐑻 𐑐𐑤𐑱𐑼",
+  "minutes": "𐑥𐑦𐑯𐑦𐑑𐑕",
+  "timeRemaining": "𐑑𐑲𐑥",
+  "pauseTimer": "𐑐𐑷𐑟 𐑑𐑲𐑥𐑼",
+  "resumeTimer": "𐑮𐑦𐑟𐑿𐑥 𐑑𐑲𐑥𐑼"
 }

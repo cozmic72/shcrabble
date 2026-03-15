@@ -100,5 +100,11 @@
   "deleteGame": "Delete Game",
   "confirmDeleteGame": "Delete this game permanently? This cannot be undone.",
   "gameDeleted": "Game deleted successfully",
-  "failedDeleteGame": "Failed to delete game"
+  "failedDeleteGame": "Failed to delete game",
+  "enableTimer": "Enable Timer",
+  "timeLimitPerPlayer": "Time Limit per Player",
+  "minutes": "minutes",
+  "timeRemaining": "Time",
+  "pauseTimer": "Pause Timer",
+  "resumeTimer": "Resume Timer"
 }
