@@ -330,6 +330,118 @@ app.post('/shcrabble/api/create', async (req, res) => {
   }
 });
 
+// Helper function to complete a vote
+async function completeVote(vote, voteId, gameId, acceptVotes, totalVoters) {
+  const game = games.get(gameId);
+  if (!game) return;
+
+  // Tally votes - accept if majority voted yes (>50%)
+  const accepted = acceptVotes > (totalVoters / 2);
+
+  console.log(`Vote complete: ${acceptVotes} accept votes, ${accepted ? 'ACCEPTED' : 'REJECTED'}`);
+
+  if (accepted) {
+    // Apply the move
+    const player = game.players.find(p => p.id === vote.playerId);
+
+    // Place the tiles on the board
+    game.placeTiles(player.index, vote.placements);
+
+    player.score += vote.score;
+    game.nextTurn();
+
+    // Update database
+    await db.query(
+      'UPDATE sessions SET game_state = ?, current_turn = ? WHERE id = ?',
+      [game.serialize(), game.currentPlayerIndex, gameId]
+    );
+
+    await db.query(
+      'UPDATE players SET score = ? WHERE id = ?',
+      [player.score, vote.playerId]
+    );
+
+    // Check if game should end (player used all tiles and bag is empty)
+    const playerWentOut = player.rack.length === 0;
+    const bagEmpty = game.tileBag.length === 0;
+
+    if (playerWentOut && bagEmpty) {
+      // Game is over - apply endgame scoring
+      game.applyEndgameScoring();
+      game.status = 'completed';
+
+      const finalScores = game.players.map(p => ({
+        name: p.name,
+        score: p.score
+      })).sort((a, b) => b.score - a.score);
+
+      // Notify all participants
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('vote-result', {
+          voteId,
+          accepted: true,
+          message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
+        });
+
+        s.emit('game-ended', {
+          finalScores
+        });
+      }
+
+      // Delete game from database
+      await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
+
+      // Remove from memory
+      games.delete(gameId);
+
+      console.log(`Game ${gameId} ended automatically after vote (player went out)`);
+    } else {
+      // Game continues - notify all players
+      const sockets = await io.in(gameId).fetchSockets();
+      for (const s of sockets) {
+        s.emit('vote-result', {
+          voteId,
+          accepted: true,
+          message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
+        });
+
+        s.emit('game-update', {
+          gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
+          lastMove: {
+            playerId: vote.playerId,
+            playerName: vote.playerName,
+            score: vote.score,
+            placements: vote.placements
+          }
+        });
+      }
+    }
+  } else {
+    // Reject the move
+    // Note: Tiles were never placed on the board or removed from rack,
+    // so we don't need to do anything to the game state.
+    // The tiles are still in the player's rack.
+
+    // Notify all players
+    const sockets = await io.in(gameId).fetchSockets();
+    for (const s of sockets) {
+      s.emit('vote-result', {
+        voteId,
+        accepted: false,
+        message: `Move rejected by vote (${vote.invalidWords.join(', ')})`
+      });
+
+      // Send updated game state with tiles back in rack
+      s.emit('game-update', {
+        gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
+      });
+    }
+  }
+
+  pendingVotes.delete(voteId);
+}
+
 // WebSocket connection handling
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
@@ -765,111 +877,7 @@ io.on('connection', (socket) => {
       const allVoted = votesReceived >= totalVoters;
 
       if (allVoted || hasAcceptMajority || hasRejectMajority) {
-        // Tally votes - accept if majority voted yes (>50%)
-        const accepted = acceptVotes > (totalVoters / 2);
-
-        console.log(`Vote complete: ${acceptVotes} accept votes, ${accepted ? 'ACCEPTED' : 'REJECTED'}`);
-
-        if (accepted) {
-          // Apply the move
-          const player = game.players.find(p => p.id === vote.playerId);
-
-          // Place the tiles on the board
-          game.placeTiles(player.index, vote.placements);
-
-          player.score += vote.score;
-          game.nextTurn();
-
-          // Update database
-          await db.query(
-            'UPDATE sessions SET game_state = ?, current_turn = ? WHERE id = ?',
-            [game.serialize(), game.currentPlayerIndex, gameId]
-          );
-
-          await db.query(
-            'UPDATE players SET score = ? WHERE id = ?',
-            [player.score, vote.playerId]
-          );
-
-          // Check if game should end (player used all tiles and bag is empty)
-          const playerWentOut = player.rack.length === 0;
-          const bagEmpty = game.tileBag.length === 0;
-
-          if (playerWentOut && bagEmpty) {
-            // Game is over - apply endgame scoring
-            game.applyEndgameScoring();
-            game.status = 'completed';
-
-            const finalScores = game.players.map(p => ({
-              name: p.name,
-              score: p.score
-            })).sort((a, b) => b.score - a.score);
-
-            // Notify all participants
-            const sockets = await io.in(gameId).fetchSockets();
-            for (const s of sockets) {
-              s.emit('vote-result', {
-                voteId,
-                accepted: true,
-                message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
-              });
-
-              s.emit('game-ended', {
-                finalScores
-              });
-            }
-
-            // Delete game from database
-            await db.query('DELETE FROM sessions WHERE id = ?', [gameId]);
-
-            // Remove from memory
-            games.delete(gameId);
-
-            console.log(`Game ${gameId} ended automatically after vote (player went out)`);
-          } else {
-            // Game continues - notify all players
-            const sockets = await io.in(gameId).fetchSockets();
-            for (const s of sockets) {
-              s.emit('vote-result', {
-                voteId,
-                accepted: true,
-                message: `Move accepted by vote (${vote.invalidWords.join(', ')})`
-              });
-
-              s.emit('game-update', {
-                gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
-                lastMove: {
-                  playerId: vote.playerId,
-                  playerName: vote.playerName,
-                  score: vote.score,
-                  placements: vote.placements
-                }
-              });
-            }
-          }
-        } else {
-          // Reject the move
-          // Note: Tiles were never placed on the board or removed from rack,
-          // so we don't need to do anything to the game state.
-          // The tiles are still in the player's rack.
-
-          // Notify all players
-          const sockets = await io.in(gameId).fetchSockets();
-          for (const s of sockets) {
-            s.emit('vote-result', {
-              voteId,
-              accepted: false,
-              message: `Move rejected by vote (${vote.invalidWords.join(', ')})`
-            });
-
-            // Send updated game state with tiles back in rack
-            s.emit('game-update', {
-              gameState: game.getState(s.data.isSpectator ? null : s.data.playerId)
-            });
-          }
-        }
-
-        pendingVotes.delete(voteId);
+        await completeVote(vote, voteId, gameId, acceptVotes, totalVoters);
       }
 
     } catch (err) {
@@ -1241,6 +1249,27 @@ io.on('connection', (socket) => {
         const spectator = game.removeSpectator(playerId);
         if (spectator) {
           console.log(`Spectator ${spectator.name} left game ${gameId}`);
+
+          // Check if there are any pending votes that need to be rechecked
+          const pendingVotesArray = Array.from(pendingVotes.values()).filter(v => v.gameId === gameId);
+          for (const vote of pendingVotesArray) {
+            const otherPlayers = game.players.filter(p => p.id !== vote.playerId);
+            const totalVoters = otherPlayers.length + game.spectators.length;
+            const votesReceived = vote.votes.size;
+            const acceptVotes = Array.from(vote.votes.values()).filter(v => v).length;
+            const rejectVotes = votesReceived - acceptVotes;
+
+            // Recheck if vote is now complete (spectator leaving might complete it)
+            const majorityNeeded = Math.floor(totalVoters / 2) + 1;
+            const hasAcceptMajority = acceptVotes >= majorityNeeded;
+            const hasRejectMajority = rejectVotes >= majorityNeeded;
+            const allVoted = votesReceived >= totalVoters;
+
+            if (allVoted || hasAcceptMajority || hasRejectMajority) {
+              console.log(`Spectator leaving triggered vote completion for vote ${vote.voteId}`);
+              await completeVote(vote, vote.voteId, gameId, acceptVotes, totalVoters);
+            }
+          }
 
           // Notify remaining participants
           const sockets = await io.in(gameId).fetchSockets();
