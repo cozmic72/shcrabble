@@ -94,6 +94,7 @@
   "ownershipTransferred": "Game ownership transferred to {name}",
   "rulesMenu": "Rules",
   "compoundLetters": "Compound Letters",
-  "splitCompounds": "Split (𐑮+𐑦 instead of 𐑼)",
-  "useCompounds": "Compound (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)"
+  "splitCompounds": "Split (𐑩+𐑮 instead of 𐑼)",
+  "useCompounds": "Compound (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)",
+  "advancedSettings": "Advanced Settings"
 }
