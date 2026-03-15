@@ -676,14 +676,17 @@ class Game {
 
   // Start timer for current turn
   startTurnTimer() {
-    if (this.timerEnabled && !this.timerPaused && this.status === 'active') {
+    // Always track time for all games (for count-up display when no time limit)
+    // But respect pause state if timer is enabled
+    if (this.status === 'active' && (!this.timerEnabled || !this.timerPaused)) {
       this.turnStartTime = Date.now();
     }
   }
 
   // Stop timer and add elapsed time to current player
   stopTurnTimer() {
-    if (this.timerEnabled && this.turnStartTime && !this.timerPaused) {
+    // Always track time for all games
+    if (this.turnStartTime && (!this.timerEnabled || !this.timerPaused)) {
       const elapsed = Math.floor((Date.now() - this.turnStartTime) / 1000);
       const currentPlayer = this.players[this.currentPlayerIndex];
       if (currentPlayer) {
@@ -776,20 +779,20 @@ class Game {
         timerEnabled: this.timerEnabled,
         timeLimit: this.timeLimit
       },
-      // Timer state
-      timer: this.timerEnabled ? {
-        enabled: true,
+      // Timer state - always send turnStartTime for count-up display
+      timer: {
+        enabled: this.timerEnabled,
         paused: this.timerPaused,
         timeLimit: this.timeLimit,
         turnStartTime: this.turnStartTime
-      } : null
+      }
     };
   }
 
   // Serialize for database storage
   serialize() {
-    // Stop timer and save elapsed time before serializing
-    if (this.timerEnabled && this.turnStartTime && !this.timerPaused) {
+    // Always save elapsed time before serializing (for all games, not just timer-enabled)
+    if (this.turnStartTime && (!this.timerEnabled || !this.timerPaused)) {
       const elapsed = Math.floor((Date.now() - this.turnStartTime) / 1000);
       const currentPlayer = this.players[this.currentPlayerIndex];
       if (currentPlayer) {

@@ -105,6 +105,8 @@
   "timeLimitPerPlayer": "Time Limit per Player",
   "minutes": "minutes",
   "timeRemaining": "Time",
+  "timeUsed": "Time",
   "pauseTimer": "Pause Timer",
-  "resumeTimer": "Resume Timer"
+  "resumeTimer": "Resume Timer",
+  "showClock": "Show Clock"
 }

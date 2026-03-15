@@ -698,14 +698,19 @@ function startTimerUpdates() {
     clearInterval(timerUpdateInterval);
   }
 
-  // Only start if timer is enabled
-  if (!gameState?.config?.timerEnabled) {
+  // Check if user wants to see clock
+  const showClock = localStorage.getItem('shcrabble-showClock') !== 'false';
+  if (!showClock) {
     return;
   }
 
-  // Update every second
+  // Update every second for all games (count-up or count-down)
   timerUpdateInterval = setInterval(() => {
-    if (gameState?.config?.timerEnabled && !gameState?.timer?.paused) {
+    // Update if timer is running (for count-down) or if game is active (for count-up)
+    const timerRunning = gameState?.config?.timerEnabled && !gameState?.timer?.paused;
+    const gameActive = gameState?.status === 'active' && gameState?.timer?.turnStartTime;
+
+    if (timerRunning || gameActive) {
       updatePlayersList(); // Refresh player cards to show updated times
     }
   }, 1000);
@@ -763,9 +768,10 @@ function updatePlayersList() {
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
 
-    // Calculate time display if timer is enabled
+    // Calculate time display if clock is shown (check user preference)
     let timeDisplay = '';
-    if (timerEnabled) {
+    const showClock = localStorage.getItem('shcrabble-showClock') !== 'false'; // Default true
+    if (showClock) {
       let timeUsed = player.timeUsed || 0;
 
       // Add current turn elapsed time if this is the current player and timer is running
@@ -774,11 +780,17 @@ function updatePlayersList() {
         timeUsed += elapsed;
       }
 
-      const timeLimit = gameState.config.timeLimit || 1500;
-      const timeRemaining = Math.max(0, timeLimit - timeUsed);
-      const isLowTime = timeRemaining < 60 && idx === gameState.currentPlayerIndex;
-      const timeColor = isLowTime ? 'color: #f44336;' : '';
-      timeDisplay = `<div class="player-score" style="${timeColor}">${i18n.t('timeRemaining')}: ${formatTime(timeRemaining)}</div>`;
+      if (timerEnabled) {
+        // Count-down mode: show time remaining
+        const timeLimit = gameState.config.timeLimit || 1500;
+        const timeRemaining = Math.max(0, timeLimit - timeUsed);
+        const isLowTime = timeRemaining < 60 && idx === gameState.currentPlayerIndex;
+        const timeColor = isLowTime ? 'color: #f44336;' : '';
+        timeDisplay = `<div class="player-score" style="${timeColor}">${i18n.t('timeRemaining')}: ${formatTime(timeRemaining)}</div>`;
+      } else {
+        // Count-up mode: show time used
+        timeDisplay = `<div class="player-score">${i18n.t('timeUsed')}: ${formatTime(timeUsed)}</div>`;
+      }
     }
 
     card.innerHTML = `
@@ -2872,6 +2884,20 @@ document.addEventListener('DOMContentLoaded', () => {
   // Language select handler
   document.getElementById('language-select').addEventListener('change', (e) => {
     i18n.setLanguage(e.target.value);
+  });
+
+  // Show clock checkbox handler
+  const showClockCheckbox = document.getElementById('show-clock');
+  showClockCheckbox.checked = localStorage.getItem('shcrabble-showClock') !== 'false';
+  showClockCheckbox.addEventListener('change', (e) => {
+    localStorage.setItem('shcrabble-showClock', e.target.checked ? 'true' : 'false');
+    // Restart timer updates to apply the change
+    stopTimerUpdates();
+    startTimerUpdates();
+    // Refresh the display
+    if (gameState) {
+      updatePlayersList();
+    }
   });
 
   // Welcome dialog handlers

@@ -105,6 +105,8 @@
   "timeLimitPerPlayer": "𐑑𐑲𐑥 𐑤𐑦𐑥𐑦𐑑 𐑐𐑻 𐑐𐑤𐑱𐑼",
   "minutes": "𐑥𐑦𐑯𐑦𐑑𐑕",
   "timeRemaining": "𐑑𐑲𐑥",
+  "timeUsed": "𐑑𐑲𐑥",
   "pauseTimer": "𐑐𐑷𐑟 𐑑𐑲𐑥𐑼",
-  "resumeTimer": "𐑮𐑦𐑟𐑿𐑥 𐑑𐑲𐑥𐑼"
+  "resumeTimer": "𐑮𐑦𐑟𐑿𐑥 𐑑𐑲𐑥𐑼",
+  "showClock": "𐑖𐑴 𐑒𐑤𐑪𐑒"
 }
