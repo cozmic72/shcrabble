@@ -20,6 +20,12 @@ let lastMovePlacements = []; // Track placements from last move for highlighting
 let highlightFadeTimeout = null; // Timeout for fading highlight
 let watchedPlayerId = null; // For spectators: which player's rack to display
 
+// Touch support for mobile
+let touchDraggedElement = null;
+let touchClone = null;
+let touchStartPos = { x: 0, y: 0 };
+let touchCurrentTarget = null;
+
 // All Shavian letters for blank tile selection
 // First 40 letters in Unicode order (4 rows of 10)
 const SHAVIAN_LETTERS = [
@@ -726,9 +732,14 @@ function updateBoard() {
           tileDiv.appendChild(points);
         }
 
-        // Add drag handlers
+        // Add drag handlers (desktop)
         tileDiv.addEventListener('dragstart', handlePlacedTileDragStart);
         tileDiv.addEventListener('dragend', handleDragEnd);
+
+        // Add touch handlers (mobile)
+        tileDiv.addEventListener('touchstart', handlePlacedTileTouchStart, { passive: false });
+        tileDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
+        tileDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
 
         square.appendChild(tileDiv);
       } else {
@@ -892,12 +903,17 @@ function updateRack() {
         }
         tileDiv.addEventListener('click', () => toggleTileForExchange(originalIndex));
       } else {
-        // Make tiles draggable in normal mode
+        // Make tiles draggable in normal mode (desktop)
         tileDiv.draggable = true;
         tileDiv.addEventListener('dragstart', handleDragStart);
         tileDiv.addEventListener('dragend', handleDragEnd);
         // Add double-click handler to place tile after last placement
         tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(originalIndex));
+
+        // Add touch support for mobile
+        tileDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
+        tileDiv.addEventListener('touchmove', handleTouchMove, { passive: false });
+        tileDiv.addEventListener('touchend', handleTouchEnd, { passive: false });
       }
     } else {
       // Spectator mode - tiles are not interactive
@@ -985,6 +1001,209 @@ function handleDragEnd(e) {
   e.target.classList.remove('dragging');
   draggedFromRack = false;
   rackDragSource = null;
+}
+
+// Touch event handlers for mobile support
+function handleTouchStart(e) {
+  const tile = e.target.closest('.rack-tile');
+  if (!tile) return;
+
+  touchDraggedElement = tile;
+  touchStartPos = {
+    x: e.touches[0].clientX,
+    y: e.touches[0].clientY
+  };
+
+  // Store tile data
+  draggedTile = {
+    letter: tile.dataset.letter,
+    points: parseInt(tile.dataset.points),
+    isBlank: tile.dataset.isBlank === 'true',
+    rackIndex: parseInt(tile.dataset.index)
+  };
+  draggedFromRack = true;
+  rackDragSource = tile;
+
+  // Create a visual clone for dragging
+  touchClone = tile.cloneNode(true);
+  touchClone.style.position = 'fixed';
+  touchClone.style.zIndex = '10000';
+  touchClone.style.pointerEvents = 'none';
+  touchClone.style.opacity = '0.8';
+  touchClone.style.width = tile.offsetWidth + 'px';
+  touchClone.style.height = tile.offsetHeight + 'px';
+  touchClone.style.left = e.touches[0].clientX - tile.offsetWidth / 2 + 'px';
+  touchClone.style.top = e.touches[0].clientY - tile.offsetHeight / 2 + 'px';
+  document.body.appendChild(touchClone);
+
+  // Make original semi-transparent
+  tile.style.opacity = '0.3';
+
+  // Play pickup sound
+  if (window.sounds) sounds.tilePickup();
+
+  e.preventDefault();
+}
+
+function handlePlacedTileTouchStart(e) {
+  const tile = e.target.closest('.placed-tile');
+  if (!tile) return;
+
+  touchDraggedElement = tile;
+  touchStartPos = {
+    x: e.touches[0].clientX,
+    y: e.touches[0].clientY
+  };
+
+  const row = parseInt(tile.dataset.row);
+  const col = parseInt(tile.dataset.col);
+
+  draggedTile = {
+    letter: tile.dataset.letter,
+    points: parseInt(tile.dataset.points),
+    isBlank: tile.dataset.isBlank === 'true',
+    fromBoard: true,
+    boardRow: row,
+    boardCol: col
+  };
+  draggedFromRack = false;
+
+  // Create visual clone
+  touchClone = tile.cloneNode(true);
+  touchClone.style.position = 'fixed';
+  touchClone.style.zIndex = '10000';
+  touchClone.style.pointerEvents = 'none';
+  touchClone.style.opacity = '0.8';
+  touchClone.style.width = tile.offsetWidth + 'px';
+  touchClone.style.height = tile.offsetHeight + 'px';
+  touchClone.style.left = e.touches[0].clientX - tile.offsetWidth / 2 + 'px';
+  touchClone.style.top = e.touches[0].clientY - tile.offsetHeight / 2 + 'px';
+  document.body.appendChild(touchClone);
+
+  tile.style.opacity = '0.3';
+
+  e.preventDefault();
+}
+
+function handleTouchMove(e) {
+  if (!touchDraggedElement || !touchClone) return;
+
+  // Update clone position
+  const touch = e.touches[0];
+  touchClone.style.left = touch.clientX - touchClone.offsetWidth / 2 + 'px';
+  touchClone.style.top = touch.clientY - touchClone.offsetHeight / 2 + 'px';
+
+  // Find element under touch
+  const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+  touchCurrentTarget = elementUnderTouch;
+
+  // Highlight drop target
+  document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+  const square = elementUnderTouch?.closest('.square');
+  if (square) {
+    square.classList.add('drag-over');
+  }
+
+  e.preventDefault();
+}
+
+function handleTouchEnd(e) {
+  if (!touchDraggedElement) return;
+
+  // Restore original tile opacity
+  touchDraggedElement.style.opacity = '';
+
+  // Remove clone
+  if (touchClone) {
+    touchClone.remove();
+    touchClone = null;
+  }
+
+  // Find drop target
+  const touch = e.changedTouches[0];
+  const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+
+  // Check if dropped on board square
+  const square = elementUnderTouch?.closest('.square');
+  if (square && draggedTile) {
+    const row = parseInt(square.dataset.row);
+    const col = parseInt(square.dataset.col);
+
+    // Check if square is empty or already has a placement
+    const hasExistingPlacement = currentPlacements.some(p => p.row === row && p.col === col);
+    const hasBoardTile = gameState.board[row][col].letter;
+
+    if (!hasBoardTile && !hasExistingPlacement) {
+      // Handle blank tiles
+      if (draggedTile.isBlank) {
+        pendingBlankPlacement = {
+          row,
+          col,
+          draggedTile,
+          rackIndex: draggedTile.rackIndex,
+          isGhost: gameState.currentPlayerIndex !== playerIndex
+        };
+        showBlankLetterDialog();
+      } else {
+        // Regular tile placement
+        const isGhostPlacement = gameState.currentPlayerIndex !== playerIndex;
+
+        // If dragging from board, remove old placement
+        if (draggedTile.fromBoard) {
+          const oldIdx = currentPlacements.findIndex(p =>
+            p.row === draggedTile.boardRow && p.col === draggedTile.boardCol
+          );
+          if (oldIdx >= 0) {
+            currentPlacements.splice(oldIdx, 1);
+          }
+        }
+
+        currentPlacements.push({
+          row,
+          col,
+          letter: draggedTile.letter,
+          points: draggedTile.points,
+          isBlank: false,
+          rackIndex: draggedTile.rackIndex,
+          isGhost: isGhostPlacement
+        });
+
+        lastPlacementPosition = { row, col };
+
+        // Play placement sound
+        if (window.sounds) sounds.tilePlaced();
+
+        updateBoard();
+        updateGameUI();
+        validateCurrentMove();
+      }
+    }
+  }
+
+  // Check if dropped back on rack
+  const rackElement = elementUnderTouch?.closest('#rack');
+  if (rackElement && draggedTile?.fromBoard) {
+    // Remove placement from board
+    const idx = currentPlacements.findIndex(p =>
+      p.row === draggedTile.boardRow && p.col === draggedTile.boardCol
+    );
+    if (idx >= 0) {
+      currentPlacements.splice(idx, 1);
+      updateBoard();
+      updateGameUI();
+      validateCurrentMove();
+    }
+  }
+
+  // Clean up
+  document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+  touchDraggedElement = null;
+  draggedTile = null;
+  draggedFromRack = false;
+  rackDragSource = null;
+  touchCurrentTarget = null;
+
+  e.preventDefault();
 }
 
 // Handle drag over rack for reordering
