@@ -245,11 +245,12 @@ function initSocket() {
       document.getElementById('invite-link').value = inviteLink;
     }
 
-    // Show welcome dialog on first visit
+    // Show welcome dialog on first visit (but skip if using compound mode)
     const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
+    const usesCompounds = gameState.config?.useCompounds || false;
     isReconnection = data.reconnected || false;
 
-    if (!hideWelcome) {
+    if (!hideWelcome && !usesCompounds) {
       document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
       document.getElementById('welcome-dialog').style.display = 'flex';
     } else if (isOwner && !isReconnection) {
@@ -1550,6 +1551,7 @@ function createGame() {
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
   const rules = document.querySelector('input[name="game-rules"]:checked').value;
+  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
   const customTileDistribution = getSelectedTileDistribution();
 
   if (!name) {
@@ -1573,6 +1575,7 @@ function createGame() {
       rackSize,
       allowVoting,
       rules,
+      useCompounds,
       customTiles: customTileDistribution
     })
   })
@@ -2645,6 +2648,25 @@ document.addEventListener('DOMContentLoaded', () => {
   // Custom tile distribution handlers
   setupCustomTileEditor();
 
+  // Add event listeners for compound mode change to reload custom tiles
+  document.querySelectorAll('input[name="use-compounds"]').forEach(radio => {
+    radio.addEventListener('change', () => {
+      const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
+      const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        try {
+          customTiles = JSON.parse(saved);
+        } catch (e) {
+          console.error('Failed to parse custom tiles:', e);
+          customTiles = null;
+        }
+      } else {
+        customTiles = null;
+      }
+    });
+  });
+
   // Initialize i18n
   i18n.init().then(() => {
     // Set current language in dropdown
@@ -2744,8 +2766,10 @@ function setupCustomTileEditor() {
     exportTilesAsCSV();
   });
 
-  // Load custom tiles from localStorage
-  const saved = localStorage.getItem('customTiles');
+  // Load custom tiles from localStorage based on compound mode
+  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
+  const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+  const saved = localStorage.getItem(storageKey);
   if (saved) {
     try {
       customTiles = JSON.parse(saved);
@@ -2807,7 +2831,9 @@ function updateTotalCount() {
 }
 
 function saveTileDistribution() {
-  localStorage.setItem('customTiles', JSON.stringify(customTiles));
+  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
+  const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+  localStorage.setItem(storageKey, JSON.stringify(customTiles));
   document.getElementById('tile-editor-dialog').style.display = 'none';
   alert('Custom tile distribution saved!');
 }

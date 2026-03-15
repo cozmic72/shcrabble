@@ -35,13 +35,15 @@ class Game {
     this.rackSize = options.rackSize || 9; // Customizable rack size
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
     this.rules = options.rules || 'casual'; // 'casual' or 'tournament'
+    this.useCompounds = options.useCompounds || false; // Use compound letters (𐑼, 𐑽, etc.)
     this.customTiles = options.customTiles || null; // Custom tile distribution
     this.consecutiveScorelessTurns = 0; // Track consecutive passes/exchanges for endgame
   }
 
   // Load tile definitions and metadata from CSV (without initializing tileBag)
   loadTileInfo() {
-    const tilesPath = path.join(__dirname, '../data/tiles.csv');
+    const filename = this.useCompounds ? 'tiles-compound.csv' : 'tiles.csv';
+    const tilesPath = path.join(__dirname, '../data', filename);
     const content = fs.readFileSync(tilesPath, 'utf8');
     const lines = content.trim().split('\n').slice(1); // Skip header
 
@@ -702,6 +704,7 @@ class Game {
         rackSize: this.rackSize,
         allowVoting: this.allowVoting,
         rules: this.rules,
+        useCompounds: this.useCompounds,
         customTiles: this.customTiles,
         totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100
       }
@@ -723,6 +726,7 @@ class Game {
       rackSize: this.rackSize,
       allowVoting: this.allowVoting,
       rules: this.rules,
+      useCompounds: this.useCompounds,
       consecutiveScorelessTurns: this.consecutiveScorelessTurns,
       customTiles: this.customTiles
     });
@@ -737,6 +741,7 @@ class Game {
       rackSize: state.rackSize || 9,
       allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
       rules: state.rules || 'casual',
+      useCompounds: state.useCompounds || false,
       customTiles: state.customTiles || null
     };
 

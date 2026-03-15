@@ -92,5 +92,8 @@
   "customDist": "Custom",
   "youAreNowOwner": "You are now the game owner",
   "ownershipTransferred": "Game ownership transferred to {name}",
-  "rulesMenu": "Rules"
+  "rulesMenu": "Rules",
+  "compoundLetters": "Compound Letters",
+  "splitCompounds": "Split (𐑮+𐑦 instead of 𐑼)",
+  "useCompounds": "Compound (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)"
 }

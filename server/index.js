@@ -290,6 +290,7 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
         rackSize: game.rackSize,
         allowVoting: game.allowVoting,
         rules: game.rules,
+        useCompounds: game.useCompounds,
         customTiles: game.customTiles,
         totalTiles: game.tiles ? game.tiles.reduce((sum, t) => sum + t.count, 0) : 100
       },
@@ -306,9 +307,9 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
 app.post('/shcrabble/api/create', async (req, res) => {
   try {
     const gameId = uuidv4();
-    const { rackSize = 9, allowVoting = true, rules = 'casual', customTiles = null } = req.body;
+    const { rackSize = 9, allowVoting = true, rules = 'casual', useCompounds = false, customTiles = null } = req.body;
 
-    const game = new Game(gameId, dictionary, { rackSize, allowVoting, rules, customTiles });
+    const game = new Game(gameId, dictionary, { rackSize, allowVoting, rules, useCompounds, customTiles });
 
     // Store in memory
     games.set(gameId, game);

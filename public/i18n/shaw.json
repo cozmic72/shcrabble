@@ -92,5 +92,8 @@
   "customDist": "𐑒𐑳𐑕𐑑𐑩𐑥",
   "youAreNowOwner": "𐑿 𐑸 𐑯𐑬 𐑞 𐑜𐑱𐑥 𐑴𐑯𐑼",
   "ownershipTransferred": "𐑜𐑱𐑥 𐑴𐑯𐑼𐑖𐑦𐑐 𐑑𐑮𐑨𐑯𐑕𐑓𐑻𐑛 𐑑 {name}",
-  "rulesMenu": "𐑮𐑵𐑤𐑟"
+  "rulesMenu": "𐑮𐑵𐑤𐑟",
+  "compoundLetters": "𐑒𐑪𐑥𐑐𐑬𐑯𐑛 𐑤𐑧𐑑𐑼𐑟",
+  "splitCompounds": "𐑕𐑐𐑤𐑦𐑑 (𐑮+𐑦 𐑦𐑯𐑕𐑑𐑧𐑛 𐑝 𐑼)",
+  "useCompounds": "𐑒𐑪𐑥𐑐𐑬𐑯𐑛 (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)"
 }
