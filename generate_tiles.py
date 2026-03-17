@@ -57,13 +57,14 @@ def split_compounds(text):
 
 
 def load_and_analyze():
-    """Load readlex and analyze letter frequencies."""
+    """Load readlex, return letter frequency counts and word list for playability analysis."""
     print(f"Loading {READLEX_PATH}...")
 
     with open(READLEX_PATH, 'r', encoding='utf-8') as f:
         readlex = json.load(f)
 
     letter_counts = Counter()
+    words = []
     total_words = 0
     filtered_words = 0
 
@@ -88,16 +89,20 @@ def load_and_analyze():
             weight = freq if USE_WORD_FREQUENCY else 1
 
             # Count letters (only valid Shavian letters)
-            for letter in shaw_word:
-                if letter in VALID_LETTERS:
-                    letter_counts[letter] += weight
+            letters_in_word = [c for c in shaw_word if c in VALID_LETTERS]
+            for letter in letters_in_word:
+                letter_counts[letter] += weight
+
+            if letters_in_word:
+                words.append((letters_in_word, freq))
 
             total_words += 1
 
     print(f"Processed {total_words} words (filtered {filtered_words})")
     print(f"Found {len(letter_counts)} unique letters")
+    print(f"Collected {len(words)} words for playability analysis")
 
-    return letter_counts
+    return letter_counts, words
 
 
 def calculate_tile_distribution(letter_counts):
@@ -192,48 +197,64 @@ def calculate_tile_distribution(letter_counts):
     return tile_counts
 
 
-def calculate_point_values(letter_counts, tile_counts):
-    """Calculate point values inversely proportional to frequency."""
-    # Calculate total occurrences
-    total_occurrences = sum(letter_counts.values())
+RACK_SIZE = 9
 
-    # Calculate inverse frequency scores
-    inverse_scores = {}
-    for letter, count in letter_counts.items():
-        if letter not in tile_counts:
-            continue
-        if count == 0:
-            continue
-        frequency = count / total_occurrences
-        if frequency == 0:
-            continue
-        # Inverse score (less frequent = higher score)
-        inverse_scores[letter] = 1.0 / frequency
 
-    # Normalize to a reasonable point scale (1-10)
-    min_score = min(inverse_scores.values())
-    max_score = max(inverse_scores.values())
+def calculate_playability(words, tile_counts):
+    """Calculate per-letter playability based on word formation probability.
+
+    For each word containing letter L, we compute the geometric mean of
+    co-letter tile probabilities — how likely you are to have the other
+    letters needed to play a word using L.
+    """
+    total_tiles = sum(tile_counts.values())
+    tile_probability = {
+        letter: count / total_tiles for letter, count in tile_counts.items()
+    }
+
+    playability = Counter()
+
+    for letters_in_word, word_freq in words:
+        if len(letters_in_word) < 2 or len(letters_in_word) > RACK_SIZE:
+            continue
+
+        for i, target_letter in enumerate(letters_in_word):
+            co_letters = letters_in_word[:i] + letters_in_word[i + 1:]
+
+            co_probability = 1.0
+            for co_letter in co_letters:
+                co_probability *= tile_probability.get(co_letter, 0.01)
+
+            co_score = co_probability ** (1.0 / len(co_letters))
+
+            playability[target_letter] += word_freq * co_score
+
+    return playability
+
+
+def calculate_point_values(tile_counts, words):
+    """Calculate point values via playability analysis."""
+    playability = calculate_playability(words, tile_counts)
+
+    log_scores = {}
+    for letter, score in playability.items():
+        if score > 0:
+            log_scores[letter] = math.log(score)
+
+    if not log_scores:
+        return {l: 1 for l in tile_counts}
+
+    min_log = min(log_scores.values())
+    max_log = max(log_scores.values())
+    log_range = max_log - min_log if max_log != min_log else 1.0
 
     point_values = {}
-    for letter, inv_score in inverse_scores.items():
-        # Scale to 1-10 range
-        normalized = (inv_score - min_score) / (max_score - min_score)
-        # Map to points: very common = 1, very rare = 10
-        points = int(1 + normalized * 9)
-
-        # Apply some smoothing based on standard Scrabble distribution
-        # Very common letters (>5% frequency) should be 1 point
-        frequency = letter_counts[letter] / total_occurrences
-        if frequency > 0.05:
-            points = 1
-        elif frequency > 0.03:
-            points = min(points, 2)
-        elif frequency > 0.02:
-            points = min(points, 3)
-        elif frequency > 0.01:
-            points = min(points, 4)
-
-        point_values[letter] = points
+    for letter in tile_counts:
+        if letter not in log_scores:
+            point_values[letter] = 10
+            continue
+        normalized = 1.0 - (log_scores[letter] - min_log) / log_range
+        point_values[letter] = max(1, min(10, int(1 + normalized * 9)))
 
     return point_values
 
@@ -299,15 +320,15 @@ def main():
     print("="*60)
 
     # Analyze letter frequencies
-    letter_counts = load_and_analyze()
+    letter_counts, words = load_and_analyze()
 
     # Calculate tile distribution
     print("\nCalculating tile distribution...")
     tile_counts = calculate_tile_distribution(letter_counts)
 
     # Calculate point values
-    print("Calculating point values...")
-    point_values = calculate_point_values(letter_counts, tile_counts)
+    print("Calculating point values via playability analysis...")
+    point_values = calculate_point_values(tile_counts, words)
 
     # Print statistics
     print_statistics(letter_counts, tile_counts, point_values)
