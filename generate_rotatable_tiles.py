@@ -17,7 +17,7 @@ from collections import Counter
 
 # Extended alphabet: yea and oevre replace err and air.
 # Mapped to unofficial codepoints in the Shavian block.
-YEA = '\U000104AC'
+YEA = '\U0001049E'
 OEVRE = '\U0001049F'
 
 COMPOUND_SPLITS = {

@@ -48,9 +48,9 @@ const ALPHABETS = {
   },
   'rotatable-extended': {
     name: 'rotatable-extended',
-    letters: BASIC_LETTERS.filter(l => l !== '𐑺' && l !== '𐑻').concat(['\u{104AC}', '\u{1049F}']),
+    letters: BASIC_LETTERS.filter(l => l !== '𐑺' && l !== '𐑻').concat(['\u{1049E}', '\u{1049F}']),
     splits: Object.assign({}, COMPOUND_SPLITS, {
-      '𐑺': '\u{104AC}𐑮',
+      '𐑺': '\u{1049E}𐑮',
       '𐑻': '\u{1049F}𐑮',
     }),
     tiles: 'tiles-rotatable-extended.csv',
@@ -70,9 +70,9 @@ const ALPHABETS = {
   },
   'split-extended': {
     name: 'split-extended',
-    letters: BASIC_LETTERS.filter(l => l !== '𐑺' && l !== '𐑻').concat(['\u{104AC}', '\u{1049F}']),
+    letters: BASIC_LETTERS.filter(l => l !== '𐑺' && l !== '𐑻').concat(['\u{1049E}', '\u{1049F}']),
     splits: Object.assign({}, COMPOUND_SPLITS, {
-      '𐑺': '\u{104AC}𐑮',
+      '𐑺': '\u{1049E}𐑮',
       '𐑻': '\u{1049F}𐑮',
     }),
     tiles: 'tiles-extended.csv',

@@ -47,6 +47,7 @@ async function runMain() {
 
   let completedGames = 0;
   const allResults = [];
+  let renderedBoards = [];
 
   const workerPromises = gamesPerWorker.map((count, workerIndex) => {
     return new Promise((resolve, reject) => {
@@ -58,6 +59,7 @@ async function runMain() {
           numGames: count,
           tilesPath,
           topN,
+          render: workerIndex === 0 ? args.render : 0,
           workerIndex,
           projectRoot: PROJECT_ROOT
         }
@@ -72,6 +74,7 @@ async function runMain() {
           }
         } else if (msg.type === 'results') {
           allResults.push(msg.data);
+          if (msg.boards) renderedBoards = renderedBoards.concat(msg.boards);
         }
       });
 
@@ -89,6 +92,10 @@ async function runMain() {
 
   const merged = mergeResults(allResults);
   printReport(merged, numGames, tilesPath, alphabet.name);
+
+  for (let i = 0; i < renderedBoards.length; i++) {
+    printBoard(renderedBoards[i], i + 1);
+  }
 }
 
 function parseArgs(argv) {
@@ -96,6 +103,7 @@ function parseArgs(argv) {
   let alphabet = 'split';
   let vocab = 0;    // 0 = unlimited
   let topN = 1;     // pick from top N moves (1 = greedy)
+  let render = 0;   // render N final boards
 
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--games' && i + 1 < argv.length) {
@@ -106,10 +114,12 @@ function parseArgs(argv) {
       vocab = parseInt(argv[++i], 10);
     } else if (argv[i] === '--top-n' && i + 1 < argv.length) {
       topN = parseInt(argv[++i], 10);
+    } else if (argv[i] === '--render' && i + 1 < argv.length) {
+      render = parseInt(argv[++i], 10);
     }
   }
 
-  return { games, alphabet, vocab, topN };
+  return { games, alphabet, vocab, topN, render };
 }
 
 function distributeWork(total, numWorkers) {
@@ -127,7 +137,7 @@ function distributeWork(total, numWorkers) {
 // ---------------------------------------------------------------------------
 
 function runWorker() {
-  const { wordList, alphabetLetters, rotationPairs, numGames, tilesPath, topN, projectRoot } = workerData;
+  const { wordList, alphabetLetters, rotationPairs, numGames, tilesPath, topN, render, projectRoot } = workerData;
 
   const Trie = require(path.join(projectRoot, 'ai', 'trie'));
   const { generateMoves, BONUS_LAYOUT } = require(path.join(projectRoot, 'ai', 'movegen'));
@@ -150,11 +160,23 @@ function runWorker() {
   }
 
   const results = createEmptyResults();
+  const renderedBoards = [];
   let progressBatch = 0;
 
   for (let g = 0; g < numGames; g++) {
     const gameResult = simulateOneGame(Game, trie, generateMoves, BONUS_LAYOUT, customTiles, alphabetLetters, rotationMap, topN);
     accumulateGameResult(results, gameResult);
+
+    if (renderedBoards.length < render) {
+      renderedBoards.push({
+        board: gameResult.board,
+        scores: gameResult.scores,
+        turns: gameResult.totalTurns,
+        passes: gameResult.totalPasses,
+        completed: gameResult.playerWentOut,
+        remaining: gameResult.remainingLetters,
+      });
+    }
 
     progressBatch++;
     if (progressBatch >= 10) {
@@ -167,7 +189,7 @@ function runWorker() {
     parentPort.postMessage({ type: 'progress', count: progressBatch });
   }
 
-  parentPort.postMessage({ type: 'results', data: results });
+  parentPort.postMessage({ type: 'results', data: results, boards: renderedBoards });
 }
 
 // ---------------------------------------------------------------------------
@@ -393,8 +415,13 @@ function simulateOneGame(Game, trie, generateMoves, bonusLayout, customTiles, al
     scores: [game.players[0].score, game.players[1].score],
     playerWentOut,
     remainingTiles: [game.players[0].rack.length, game.players[1].rack.length],
+    remainingLetters: [
+      game.players[0].rack.map(t => t.isBlank ? '*' : t.letter),
+      game.players[1].rack.map(t => t.isBlank ? '*' : t.letter),
+    ],
     moveScores,
-    tileTracker
+    tileTracker,
+    board: game.board,
   };
 }
 
@@ -506,6 +533,46 @@ function mergeResults(allResults) {
 // ---------------------------------------------------------------------------
 // Reporting
 // ---------------------------------------------------------------------------
+
+function printBoard(gameData, gameNum) {
+  const { board, scores, turns, passes, completed, remaining } = gameData;
+  const status = completed ? 'completed' : 'stalled';
+
+  console.log(`\n${'='.repeat(70)}`);
+  console.log(`  GAME ${gameNum} — ${status} (${turns} turns, ${passes} passes)`);
+  console.log(`  P1: ${scores[0]} pts  P2: ${scores[1]} pts`);
+  if (remaining[0].length > 0) console.log(`  P1 rack: ${remaining[0].join(' ')}`);
+  if (remaining[1].length > 0) console.log(`  P2 rack: ${remaining[1].join(' ')}`);
+  console.log('='.repeat(70));
+
+  // Column headers
+  const colNums = '    ' + Array.from({length: 15}, (_, i) =>
+    String(i).padStart(2)).join('');
+  console.log(colNums);
+  console.log('   +' + '──'.repeat(15) + '─+');
+
+  for (let r = 0; r < 15; r++) {
+    let row = String(r).padStart(2) + ' │';
+    for (let c = 0; c < 15; c++) {
+      const cell = board[r][c];
+      if (cell.letter !== null) {
+        row += cell.letter + ' ';
+      } else {
+        const bonus = cell.bonus;
+        if (bonus === 'TW') row += '≡ ';
+        else if (bonus === 'DW') row += '▪ ';
+        else if (bonus === 'TL') row += '∴ ';
+        else if (bonus === 'DL') row += '· ';
+        else if (r === 7 && c === 7) row += '★ ';
+        else row += '  ';
+      }
+    }
+    row += '│';
+    console.log(row);
+  }
+  console.log('   +' + '──'.repeat(15) + '─+');
+  console.log('  Legend: ≡=TW  ▪=DW  ∴=TL  ·=DL  ★=center');
+}
 
 function printReport(results, numGames, tilesPath, alphabetName) {
   const fs = require('fs');
