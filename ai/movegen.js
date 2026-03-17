@@ -124,11 +124,40 @@ function generateDirectionalMoves(board, rack, trie, bonusLayout, boardIsEmpty, 
         totalTiles: rack.length,
       };
 
-      // Try left parts of length 0..maxLeftExtend
-      extendLeft(
-        board, trie, crossChecks, bonusLayout, row, anchorCol,
-        maxLeftExtend, rackState, [], 0, trie.root, moves, alphabet
-      );
+      // Check if there are existing board tiles immediately to the left of the anchor.
+      // If so, walk through them in the trie to get the correct starting node,
+      // then only extend right (no free left extension is possible).
+      if (anchorCol > 0 && board[row][anchorCol - 1].letter !== null) {
+        // Find the leftmost contiguous board tile
+        let leftStart = anchorCol - 1;
+        while (leftStart > 0 && board[row][leftStart - 1].letter !== null) leftStart--;
+
+        // Walk the existing prefix through the trie
+        let node = trie.root;
+        let valid = true;
+        for (let c = leftStart; c < anchorCol; c++) {
+          node = node.children.get(board[row][c].letter);
+          if (!node) { valid = false; break; }
+        }
+        if (valid) {
+          extendRight(
+            board, trie, crossChecks, bonusLayout, row, anchorCol, anchorCol,
+            rackState, [], 0, node, moves, alphabet
+          );
+        }
+      } else {
+        // No board tiles to the left — try left parts of length 0..maxLeftExtend.
+        // For each length, build the left part left-to-right through the trie,
+        // then extend right from the anchor column.
+        for (let leftLen = 0; leftLen <= maxLeftExtend; leftLen++) {
+          const startCol = anchorCol - leftLen;
+          if (startCol < 0) break;
+          buildFromLeft(
+            board, trie, crossChecks, bonusLayout, row, anchorCol,
+            startCol, rackState, [], 0, trie.root, moves, alphabet
+          );
+        }
+      }
     }
   }
 }
@@ -245,33 +274,31 @@ function restoreRotatedLetter(rackState, primaryLetter, rotInfo, prevCount) {
   rackState.letters.set(primaryLetter, prevCount);
 }
 
-// Recursive left-part building, then extends right through the anchor
-function extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftRemaining, rackState, placements, tilesPlaced, node, moves, alphabet) {
-  // Try extending right from current position (left part is complete)
-  extendRight(board, trie, crossChecks, bonusLayout, row, anchorCol, anchorCol, rackState, placements, tilesPlaced, node, moves, alphabet);
+// Build left part left-to-right from startCol toward anchorCol, then extend right.
+// This traverses the trie in reading order (left-to-right), which is the correct
+// direction for trie lookups. Each call must fill ALL cells from currentCol to
+// anchorCol-1 (either from rack or existing board tiles) before calling extendRight.
+function buildFromLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, currentCol, rackState, placements, tilesPlaced, node, moves, alphabet) {
+  if (currentCol === anchorCol) {
+    // Left part is complete, extend right from the anchor
+    extendRight(board, trie, crossChecks, bonusLayout, row, anchorCol, anchorCol, rackState, placements, tilesPlaced, node, moves, alphabet);
+    return;
+  }
 
-  if (leftRemaining === 0) return;
+  const col = currentCol;
 
-  const col = anchorCol - (placements.filter(p => p.col < anchorCol).length + countBoardTilesLeft(board, row, anchorCol, placements));
-  const leftCol = anchorCol - tilesPlaced - 1;
-  // Actually we need to compute the column for the next left tile
-  // The left part grows leftward from anchorCol-1
-  const nextCol = anchorCol - (countLeftPartSize(placements, anchorCol, board, row)) - 1;
-
-  if (nextCol < 0) return;
-
-  // If the cell already has a tile, walk through it
-  if (board[row][nextCol].letter !== null) {
-    const existingLetter = board[row][nextCol].letter;
+  // If the cell already has a tile, walk through it in the trie
+  if (board[row][col].letter !== null) {
+    const existingLetter = board[row][col].letter;
     const childNode = node.children.get(existingLetter);
     if (childNode) {
-      extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftRemaining - 1, rackState, placements, tilesPlaced, childNode, moves, alphabet);
+      buildFromLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, col + 1, rackState, placements, tilesPlaced, childNode, moves, alphabet);
     }
     return;
   }
 
   // Check cross-checks for this cell
-  const cc = crossChecks[row][nextCol];
+  const cc = crossChecks[row][col];
 
   // Try each letter from rack
   const tried = new Set();
@@ -286,9 +313,9 @@ function extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftR
 
     const consumedRotatable = consumePrimaryLetter(rackState, letter, count);
     const points = rackState.points.get(letter) || 0;
-    placements.push({ row, col: nextCol, letter, points, isBlank: false });
+    placements.push({ row, col, letter, points, isBlank: false });
 
-    extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftRemaining - 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
+    buildFromLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, col + 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
 
     placements.pop();
     restorePrimaryLetter(rackState, letter, count, consumedRotatable);
@@ -305,9 +332,9 @@ function extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftR
     if (!childNode) continue;
 
     const prevCount = consumeRotatedLetter(rackState, primaryLetter, rotInfo);
-    placements.push({ row, col: nextCol, letter, points: rotInfo.rotatedPoints, isBlank: false, primaryLetter });
+    placements.push({ row, col, letter, points: rotInfo.rotatedPoints, isBlank: false, primaryLetter });
 
-    extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftRemaining - 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
+    buildFromLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, col + 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
 
     placements.pop();
     restoreRotatedLetter(rackState, primaryLetter, rotInfo, prevCount);
@@ -322,42 +349,12 @@ function extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftR
       const childNode = node.children.get(letter);
       if (!childNode) continue;
 
-      placements.push({ row, col: nextCol, letter, points: 0, isBlank: true });
-      extendLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, leftRemaining - 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
+      placements.push({ row, col, letter, points: 0, isBlank: true });
+      buildFromLeft(board, trie, crossChecks, bonusLayout, row, anchorCol, col + 1, rackState, placements, tilesPlaced + 1, childNode, moves, alphabet);
       placements.pop();
     }
     rackState.blanks++;
   }
-}
-
-function countLeftPartSize(placements, anchorCol, board, row) {
-  // Count how many cells to the left of anchor are covered (placements + board tiles traversed)
-  let count = 0;
-  for (let i = 0; i < placements.length; i++) {
-    if (placements[i].col < anchorCol) count++;
-  }
-  // Also count board tiles that are between leftmost placement and anchor
-  if (count > 0) {
-    const leftmost = Math.min(...placements.filter(p => p.col < anchorCol).map(p => p.col));
-    for (let c = leftmost; c < anchorCol; c++) {
-      if (board[row][c].letter !== null) count++;
-    }
-  }
-  return count;
-}
-
-function countBoardTilesLeft(board, row, anchorCol, placements) {
-  let count = 0;
-  if (placements.length > 0) {
-    const leftCols = placements.filter(p => p.col < anchorCol).map(p => p.col);
-    if (leftCols.length > 0) {
-      const leftmost = Math.min(...leftCols);
-      for (let c = leftmost; c < anchorCol; c++) {
-        if (board[row][c].letter !== null) count++;
-      }
-    }
-  }
-  return count;
 }
 
 function extendRight(board, trie, crossChecks, bonusLayout, row, anchorCol, col, rackState, placements, tilesPlaced, node, moves, alphabet) {
