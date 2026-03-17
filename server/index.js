@@ -362,6 +362,7 @@ app.post('/shcrabble/api/create', async (req, res) => {
       allowVoting = true,
       rules = 'casual',
       useCompounds = false,
+      useRotation = false,
       customTiles = null,
       timerEnabled = false,
       timeLimit = 25 * 60 // Default 25 minutes in seconds
@@ -372,6 +373,7 @@ app.post('/shcrabble/api/create', async (req, res) => {
       allowVoting,
       rules,
       useCompounds,
+      useRotation,
       customTiles,
       timerEnabled,
       timeLimit

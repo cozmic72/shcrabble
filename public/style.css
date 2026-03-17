@@ -919,6 +919,32 @@ body {
   color: #333;
 }
 
+/* Rotatable tile indicator */
+.rack-tile.rotatable {
+  cursor: pointer;
+}
+
+/* Upside-down alt points (top-left, gray, small) */
+.rack-tile .tile-alt-points {
+  position: absolute;
+  top: 2px;
+  left: 3px;
+  font-size: 0.4em;
+  font-weight: normal;
+  color: #999;
+  transform: rotate(180deg);
+}
+
+/* Rotation animation */
+@keyframes rotateTile180 {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-180deg); }
+}
+
+.rack-tile.rotating {
+  animation: rotateTile180 0.3s ease-in-out;
+}
+
 .rack-tile:active {
   cursor: grabbing;
 }

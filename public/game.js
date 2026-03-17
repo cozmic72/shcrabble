@@ -1103,23 +1103,45 @@ function updateRack() {
       // All existing tiles slide together in unison
     }
 
+    // Determine display letter and points (accounting for rotation state)
+    const isRotated = tile.isRotatable && tile.isRotated;
+    const displayLetter = isRotated ? tile.rotatedLetter : tile.letter;
+    const displayPoints = isRotated ? tile.rotatedPoints : tile.points;
+    const altPoints = tile.isRotatable ? (isRotated ? tile.points : tile.rotatedPoints) : null;
+
     if (tile.isBlank) {
       tileDiv.classList.add('blank');
       tileDiv.textContent = '?';
     } else {
-      tileDiv.textContent = tile.letter;
+      // Add alt points indicator for rotatable tiles (top-left, upside-down)
+      if (tile.isRotatable) {
+        tileDiv.classList.add('rotatable');
+        const altPointsSpan = document.createElement('span');
+        altPointsSpan.className = 'tile-alt-points';
+        altPointsSpan.textContent = altPoints;
+        tileDiv.appendChild(altPointsSpan);
+      }
+
+      tileDiv.appendChild(document.createTextNode(displayLetter));
 
       // Add points display
       const pointsSpan = document.createElement('span');
       pointsSpan.className = 'tile-points';
-      pointsSpan.textContent = tile.points;
+      pointsSpan.textContent = displayPoints;
       tileDiv.appendChild(pointsSpan);
     }
 
     tileDiv.dataset.index = originalIndex;
-    tileDiv.dataset.letter = tile.letter;
-    tileDiv.dataset.points = tile.points;
+    tileDiv.dataset.letter = displayLetter;
+    tileDiv.dataset.points = displayPoints;
     tileDiv.dataset.isBlank = tile.isBlank;
+
+    if (tile.isRotatable) {
+      tileDiv.dataset.rotatable = 'true';
+      tileDiv.dataset.rotatedLetter = tile.rotatedLetter;
+      tileDiv.dataset.rotatedPoints = tile.rotatedPoints;
+      tileDiv.dataset.isRotated = tile.isRotated ? 'true' : 'false';
+    }
 
     // Only make tiles interactive for actual players, not spectators
     if (playerIndex !== null) {
@@ -1134,10 +1156,23 @@ function updateRack() {
       } else {
         // Make tiles draggable in normal mode (desktop)
         tileDiv.draggable = true;
-        tileDiv.addEventListener('dragstart', handleDragStart);
+        tileDiv.addEventListener('dragstart', (e) => {
+          tileDiv.classList.add('was-dragged');
+          handleDragStart(e);
+        });
         tileDiv.addEventListener('dragend', handleDragEnd);
         // Add double-click handler to place tile after last placement
         tileDiv.addEventListener('dblclick', () => handleTileDoubleClick(originalIndex));
+
+        // Add click handler for rotation (single click without drag)
+        if (tile.isRotatable) {
+          tileDiv.addEventListener('click', (e) => {
+            if (!tileDiv.classList.contains('was-dragged')) {
+              rotateTile(originalIndex);
+            }
+            tileDiv.classList.remove('was-dragged');
+          });
+        }
 
         // Add touch support for mobile
         tileDiv.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -1158,6 +1193,30 @@ function updateRack() {
   // Make rack itself a drop zone for reordering
   rackDiv.addEventListener('dragover', handleRackDragOver);
   rackDiv.addEventListener('drop', handleRackDrop);
+}
+
+function rotateTile(rackIndex) {
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer || !myPlayer.rack) return;
+
+  const tile = myPlayer.rack[rackIndex];
+  if (!tile || !tile.isRotatable) return;
+
+  // Toggle rotation state
+  tile.isRotated = !tile.isRotated;
+
+  // Find the tile div in the rack to animate it
+  const rackDiv = document.getElementById('rack');
+  const tileDiv = rackDiv.querySelector(`.rack-tile[data-index="${rackIndex}"]`);
+  if (tileDiv) {
+    tileDiv.classList.add('rotating');
+    tileDiv.addEventListener('animationend', () => {
+      tileDiv.classList.remove('rotating');
+      updateRack();
+    }, { once: true });
+  } else {
+    updateRack();
+  }
 }
 
 function handleSquareClick(row, col) {
@@ -1194,11 +1253,14 @@ function handleSquareClick(row, col) {
 
 // Drag and drop handlers
 function handleDragStart(e) {
+  const tileEl = e.target.closest('.rack-tile');
+  const isRotated = tileEl && tileEl.dataset.isRotated === 'true';
   draggedTile = {
     letter: e.target.dataset.letter,
     points: parseInt(e.target.dataset.points),
     isBlank: e.target.dataset.isBlank === 'true',
-    rackIndex: parseInt(e.target.dataset.index)
+    rackIndex: parseInt(e.target.dataset.index),
+    isRotated: isRotated
   };
   draggedFromRack = true;
   rackDragSource = e.target;
@@ -1251,7 +1313,8 @@ function handleTouchStart(e) {
     letter: tile.dataset.letter,
     points: parseInt(tile.dataset.points),
     isBlank: tile.dataset.isBlank === 'true',
-    rackIndex: parseInt(tile.dataset.index)
+    rackIndex: parseInt(tile.dataset.index),
+    isRotated: tile.dataset.isRotated === 'true'
   };
   draggedFromRack = true;
   rackDragSource = tile;
@@ -1393,7 +1456,7 @@ function handleTouchEnd(e) {
           }
         }
 
-        currentPlacements.push({
+        const touchPlacement = {
           row,
           col,
           letter: draggedTile.letter,
@@ -1401,7 +1464,9 @@ function handleTouchEnd(e) {
           isBlank: false,
           rackIndex: draggedTile.rackIndex,
           isGhost: isGhostPlacement
-        });
+        };
+        if (draggedTile.isRotated) touchPlacement.isRotated = true;
+        currentPlacements.push(touchPlacement);
 
         lastPlacementPosition = { row, col };
 
@@ -1735,7 +1800,8 @@ function createGame() {
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
   const rules = document.querySelector('input[name="game-rules"]:checked').value;
-  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
+  const useRotation = document.getElementById('use-rotation').checked;
+  const useCompounds = !useRotation && document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
   const customTileDistribution = getSelectedTileDistribution();
   const timerEnabled = document.getElementById('timer-enabled').checked;
   const timeLimitMinutes = parseInt(document.getElementById('time-limit-minutes').value) || 25;
@@ -1762,6 +1828,7 @@ function createGame() {
       allowVoting,
       rules,
       useCompounds,
+      useRotation,
       customTiles: customTileDistribution,
       timerEnabled,
       timeLimit: timeLimitMinutes * 60 // Convert to seconds
@@ -1992,15 +2059,18 @@ function handleTileDoubleClick(rackIndex) {
     return;
   }
 
-  // Add placement
-  currentPlacements.push({
+  // Add placement (accounting for rotation)
+  const isRotated = tile.isRotatable && tile.isRotated;
+  const dblClickPlacement = {
     row: nextPos.row,
     col: nextPos.col,
-    letter: tile.letter,
-    points: tile.points,
+    letter: isRotated ? tile.rotatedLetter : tile.letter,
+    points: isRotated ? tile.rotatedPoints : tile.points,
     isBlank: false,
     rackIndex: rackIndex
-  });
+  };
+  if (isRotated) dblClickPlacement.isRotated = true;
+  currentPlacements.push(dblClickPlacement);
 
   updateBoard();
   updateGameUI();
@@ -2620,6 +2690,19 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timer-settings').style.display = e.target.checked ? 'block' : 'none';
   });
 
+  // Rotation checkbox toggle - mutually exclusive with compound letters
+  document.getElementById('use-rotation').addEventListener('change', (e) => {
+    const compoundGroup = document.getElementById('compound-letters-group');
+    const compoundRadios = compoundGroup.querySelectorAll('input[type="radio"]');
+    if (e.target.checked) {
+      compoundRadios.forEach(radio => { radio.disabled = true; });
+      compoundGroup.style.opacity = '0.5';
+    } else {
+      compoundRadios.forEach(radio => { radio.disabled = false; });
+      compoundGroup.style.opacity = '1';
+    }
+  });
+
   // Event listeners for dialog confirm buttons
   document.getElementById('create-game-confirm-btn').addEventListener('click', createGame);
   document.getElementById('join-game-confirm-btn').addEventListener('click', joinGame);
@@ -2769,7 +2852,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // Add new placement (non-blank)
-    currentPlacements.push({
+    const dropPlacement = {
       row,
       col,
       letter: draggedTile.letter,
@@ -2777,7 +2860,9 @@ document.addEventListener('DOMContentLoaded', () => {
       isBlank: false,
       rackIndex: rackIndex,
       isGhost: isGhostPlacement
-    });
+    };
+    if (draggedTile.isRotated) dropPlacement.isRotated = true;
+    currentPlacements.push(dropPlacement);
 
     // Play placement sound
     if (window.sounds) sounds.tilePlaced();

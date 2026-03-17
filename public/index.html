@@ -252,7 +252,7 @@
           <div style="margin-top: 10px;">
             <div class="setting-item">
               <label data-i18n="compoundLetters">Compound Letters</label>
-              <div style="display: flex; gap: 20px; margin-top: 5px;">
+              <div id="compound-letters-group" style="display: flex; gap: 20px; margin-top: 5px;">
                 <label class="radio-label">
                   <input type="radio" name="use-compounds" value="split" checked>
                   <span data-i18n="splitCompounds">Split (𐑩+𐑮 instead of 𐑼)</span>
@@ -262,6 +262,12 @@
                   <span data-i18n="useCompounds">Compound (𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿)</span>
                 </label>
               </div>
+            </div>
+            <div class="setting-item">
+              <label style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="use-rotation" style="width: 20px; height: 20px;">
+                <span data-i18n="useRotation">Use Rotation Tiles (27 tiles, each flippable)</span>
+              </label>
             </div>
             <div class="setting-item">
               <label>Tile Distribution</label>

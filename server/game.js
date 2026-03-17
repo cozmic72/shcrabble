@@ -18,6 +18,19 @@ const BONUS_SQUARES = {
        [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]]
 };
 
+const ROTATION_PAIRS = [
+  ['𐑐','𐑚'], ['𐑑','𐑛'], ['𐑒','𐑜'], ['𐑓','𐑝'],
+  ['𐑔','𐑞'], ['𐑕','𐑟'], ['𐑖','𐑠'], ['𐑗','𐑡'],
+  ['𐑙','𐑣'], ['𐑤','𐑮'], ['𐑧','𐑪'], ['𐑨','𐑩'],
+  ['𐑫','𐑵'], ['𐑬','𐑶'], ['𐑭','𐑷'],
+];
+
+const ROTATION_MAP = new Map();
+for (const [a, b] of ROTATION_PAIRS) {
+  ROTATION_MAP.set(a, b);
+  ROTATION_MAP.set(b, a);
+}
+
 class Game {
   constructor(gameId, dictionary = null, options = {}) {
     this.gameId = gameId;
@@ -36,6 +49,7 @@ class Game {
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
     this.rules = options.rules || 'casual'; // 'casual' or 'tournament'
     this.useCompounds = options.useCompounds || false; // Use compound letters (𐑼, 𐑽, etc.)
+    this.useRotation = options.useRotation || false; // Use rotatable tiles
     this.customTiles = options.customTiles || null; // Custom tile distribution
     this.consecutiveScorelessTurns = 0; // Track consecutive passes/exchanges for endgame
 
@@ -48,7 +62,10 @@ class Game {
 
   // Load tile definitions and metadata from CSV (without initializing tileBag)
   loadTileInfo() {
-    const filename = this.useCompounds ? 'tiles-compound.csv' : 'tiles.csv';
+    let filename = 'tiles.csv';
+    if (this.useRotation) filename = 'tiles-rotatable.csv';
+    else if (this.useCompounds) filename = 'tiles-compound.csv';
+
     const tilesPath = path.join(__dirname, '../data', filename);
     const content = fs.readFileSync(tilesPath, 'utf8');
     const lines = content.trim().split('\n').slice(1); // Skip header
@@ -57,7 +74,12 @@ class Game {
     this.allLetters = []; // Store all possible letters for wildcard validation
 
     lines.forEach(line => {
-      const [letter, count, points] = line.split(',');
+      const parts = line.split(',');
+      const letter = parts[0];
+      const count = parts[1];
+      const points = parts[2];
+      const rotatedPoints = parts[3] !== undefined ? parts[3].trim() : '';
+
       const tileInfo = {
         letter: letter === 'blank' ? '' : letter,
         points: parseInt(points),
@@ -65,11 +87,24 @@ class Game {
         count: parseInt(count)
       };
 
+      if (this.useRotation && rotatedPoints !== '' && letter !== 'blank') {
+        const rotatedLetter = ROTATION_MAP.get(letter);
+        if (rotatedLetter) {
+          tileInfo.isRotatable = true;
+          tileInfo.rotatedLetter = rotatedLetter;
+          tileInfo.rotatedPoints = parseInt(rotatedPoints);
+        }
+      }
+
       this.tiles.push(tileInfo);
 
       // Store non-blank letters for wildcard validation
       if (letter !== 'blank') {
         this.allLetters.push(letter);
+        // Also add rotated letters as valid for wildcard validation
+        if (tileInfo.isRotatable) {
+          this.allLetters.push(tileInfo.rotatedLetter);
+        }
       }
     });
   }
@@ -96,11 +131,20 @@ class Game {
     this.tiles.forEach(tileInfo => {
       // Add tiles to bag
       for (let i = 0; i < tileInfo.count; i++) {
-        this.tileBag.push({
+        const tile = {
           letter: tileInfo.letter,
           points: tileInfo.points,
           isBlank: tileInfo.isBlank
-        });
+        };
+
+        if (tileInfo.isRotatable) {
+          tile.isRotatable = true;
+          tile.rotatedLetter = tileInfo.rotatedLetter;
+          tile.rotatedPoints = tileInfo.rotatedPoints;
+          tile.isRotated = false;
+        }
+
+        this.tileBag.push(tile);
       }
     });
 
@@ -373,7 +417,9 @@ class Game {
       const idx = player.rack.findIndex((t, i) => {
         // Skip tiles we've already marked for removal
         if (tilesToRemove.includes(i)) return false;
-        return (t.isBlank && p.isBlank) || (!t.isBlank && t.letter === p.letter);
+        return (t.isBlank && p.isBlank) ||
+               (!t.isBlank && !p.isBlank && t.letter === p.letter) ||
+               (!t.isBlank && !p.isBlank && t.isRotatable && p.isRotated && t.rotatedLetter === p.letter);
       });
       if (idx < 0) {
         missingTiles.push(p.isBlank ? '(blank)' : p.letter);
@@ -390,7 +436,15 @@ class Game {
     placements.forEach(p => {
       this.board[p.row][p.col].letter = p.letter;
       this.board[p.row][p.col].isBlank = p.isBlank || false;
-      this.board[p.row][p.col].points = p.points || 0;
+      // For rotated tiles, use the rotated points value
+      if (p.isRotated) {
+        const rackTile = player.rack.find((t, i) =>
+          tilesToRemove.includes(i) && t.isRotatable && t.rotatedLetter === p.letter
+        );
+        this.board[p.row][p.col].points = rackTile ? rackTile.rotatedPoints : (p.points || 0);
+      } else {
+        this.board[p.row][p.col].points = p.points || 0;
+      }
     });
 
     // Remove used tiles from rack (now validated)
@@ -785,6 +839,7 @@ class Game {
         allowVoting: this.allowVoting,
         rules: this.rules,
         useCompounds: this.useCompounds,
+        useRotation: this.useRotation,
         customTiles: this.customTiles,
         totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100,
         timerEnabled: this.timerEnabled,
@@ -825,6 +880,7 @@ class Game {
       allowVoting: this.allowVoting,
       rules: this.rules,
       useCompounds: this.useCompounds,
+      useRotation: this.useRotation,
       consecutiveScorelessTurns: this.consecutiveScorelessTurns,
       customTiles: this.customTiles,
       timerEnabled: this.timerEnabled,
@@ -843,6 +899,7 @@ class Game {
       allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
       rules: state.rules || 'casual',
       useCompounds: state.useCompounds || false,
+      useRotation: state.useRotation || false,
       customTiles: state.customTiles || null,
       timerEnabled: state.timerEnabled || false,
       timeLimit: state.timeLimit || 25 * 60
