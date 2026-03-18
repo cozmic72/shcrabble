@@ -1,5 +1,6 @@
 const express = require('express');
 const http = require('http');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const path = require('path');
 const crypto = require('crypto');
@@ -567,6 +568,36 @@ app.get('/shcrabble/api/game-info/:gameId', async (req, res) => {
     console.error('Error fetching game info:', err);
     res.status(500).json({ error: 'Failed to fetch game info' });
   }
+});
+
+// Get default tiles for a given tile mode
+app.get('/shcrabble/api/default-tiles/:tileMode', (req, res) => {
+  const TILE_FILES = {
+    'split': 'tiles.csv',
+    'split-extended': 'tiles-extended.csv',
+    'rotation': 'tiles-rotatable.csv',
+    'rotation-extended': 'tiles-rotatable-extended.csv',
+  };
+  const filename = TILE_FILES[req.params.tileMode];
+  if (!filename) return res.status(400).json({ error: 'Unknown tile mode' });
+
+  const filePath = path.join(__dirname, '..', 'data', filename);
+  const content = fs.readFileSync(filePath, 'utf8');
+  const lines = content.trim().split('\n').slice(1);
+  const tiles = lines.map(line => {
+    const parts = line.split(',');
+    const tile = {
+      letter: parts[0].trim(),
+      count: parseInt(parts[1]),
+      points: parseInt(parts[2]),
+    };
+    if (parts[3] && parts[3].trim() !== '') {
+      tile.rotatedPoints = parseInt(parts[3].trim());
+    }
+    return tile;
+  });
+
+  res.json({ tiles, tileMode: req.params.tileMode });
 });
 
 // Create new game

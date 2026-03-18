@@ -758,8 +758,8 @@ body {
   align-items: center;
   justify-content: center;
   font-size: 1.2em;
-  color: rgba(0, 0, 0, 0.4);
-  background: rgba(255, 215, 0, 0.3);
+  color: rgba(0, 0, 0, 0.6);
+  background: rgba(255, 215, 0, 0.5);
   border-radius: 2px;
   pointer-events: none;
   z-index: 3;

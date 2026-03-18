@@ -3152,51 +3152,17 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // Custom Tile Distribution
-const DEFAULT_TILES = [
-  { letter: '𐑐', count: 2, points: 1 },
-  { letter: '𐑑', count: 5, points: 1 },
-  { letter: '𐑒', count: 3, points: 1 },
-  { letter: '𐑓', count: 2, points: 1 },
-  { letter: '𐑔', count: 2, points: 2 },
-  { letter: '𐑕', count: 5, points: 1 },
-  { letter: '𐑖', count: 2, points: 1 },
-  { letter: '𐑗', count: 1, points: 2 },
-  { letter: '𐑘', count: 1, points: 1 },
-  { letter: '𐑙', count: 1, points: 1 },
-  { letter: '𐑚', count: 2, points: 1 },
-  { letter: '𐑛', count: 3, points: 1 },
-  { letter: '𐑜', count: 2, points: 1 },
-  { letter: '𐑝', count: 2, points: 1 },
-  { letter: '𐑞', count: 3, points: 1 },
-  { letter: '𐑟', count: 3, points: 1 },
-  { letter: '𐑠', count: 1, points: 10 },
-  { letter: '𐑡', count: 1, points: 2 },
-  { letter: '𐑢', count: 3, points: 1 },
-  { letter: '𐑣', count: 1, points: 1 },
-  { letter: '𐑤', count: 4, points: 1 },
-  { letter: '𐑥', count: 3, points: 1 },
-  { letter: '𐑦', count: 5, points: 1 },
-  { letter: '𐑧', count: 2, points: 1 },
-  { letter: '𐑨', count: 2, points: 1 },
-  { letter: '𐑩', count: 5, points: 1 },
-  { letter: '𐑪', count: 2, points: 1 },
-  { letter: '𐑫', count: 2, points: 2 },
-  { letter: '𐑬', count: 1, points: 2 },
-  { letter: '𐑭', count: 1, points: 1 },
-  { letter: '𐑮', count: 5, points: 1 },
-  { letter: '𐑯', count: 5, points: 1 },
-  { letter: '𐑰', count: 2, points: 1 },
-  { letter: '𐑱', count: 2, points: 1 },
-  { letter: '𐑲', count: 2, points: 1 },
-  { letter: '𐑳', count: 2, points: 1 },
-  { letter: '𐑴', count: 1, points: 1 },
-  { letter: '𐑵', count: 1, points: 1 },
-  { letter: '𐑶', count: 1, points: 7 },
-  { letter: '𐑷', count: 2, points: 1 },
-  { letter: '𐑺', count: 1, points: 2 },
-  { letter: '𐑻', count: 2, points: 1 },
-  { letter: 'blank', count: 2, points: 0 }
-];
+function getCurrentTileMode() {
+  const baseMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const useExtended = document.getElementById('use-extended').checked;
+  return useExtended ? baseMode + '-extended' : baseMode;
+}
+
+async function loadDefaultTiles(tileMode) {
+  const res = await fetch('/shcrabble/api/default-tiles/' + tileMode);
+  const data = await res.json();
+  return data.tiles;
+}
 
 let customTiles = null;
 
@@ -3222,8 +3188,8 @@ function setupCustomTileEditor() {
   });
 
   // Reset to default
-  document.getElementById('reset-tiles-btn').addEventListener('click', () => {
-    customTiles = JSON.parse(JSON.stringify(DEFAULT_TILES));
+  document.getElementById('reset-tiles-btn').addEventListener('click', async () => {
+    customTiles = await loadDefaultTiles(getCurrentTileMode());
     populateTileEditor();
   });
 
@@ -3256,10 +3222,10 @@ function setupCustomTileEditor() {
   }
 }
 
-function openTileEditor() {
-  // Initialize with custom tiles or default
+async function openTileEditor() {
+  const tileMode = getCurrentTileMode();
   if (!customTiles) {
-    customTiles = JSON.parse(JSON.stringify(DEFAULT_TILES));
+    customTiles = await loadDefaultTiles(tileMode);
   }
   populateTileEditor();
   document.getElementById('tile-editor-dialog').style.display = 'flex';
@@ -3267,10 +3233,37 @@ function openTileEditor() {
 
 function populateTileEditor() {
   const tbody = document.getElementById('tile-editor-body');
+  const thead = document.getElementById('tile-editor-head');
   tbody.innerHTML = '';
+
+  const tileMode = getCurrentTileMode();
+  const isRotatable = tileMode.startsWith('rotation');
+
+  if (thead) {
+    thead.innerHTML = `
+      <tr>
+        <th style="padding: 8px; border: 1px solid #ddd;">Letter</th>
+        <th style="padding: 8px; border: 1px solid #ddd;">Count</th>
+        <th style="padding: 8px; border: 1px solid #ddd;">Points</th>
+        ${isRotatable ? '<th style="padding: 8px; border: 1px solid #ddd;">Rotated Pts</th>' : ''}
+      </tr>
+    `;
+  }
 
   customTiles.forEach((tile, index) => {
     const row = document.createElement('tr');
+    let rotatedCol = '';
+    if (isRotatable && tile.rotatedPoints !== undefined) {
+      rotatedCol = `
+        <td style="padding: 8px; border: 1px solid #ddd;">
+          <input type="number" min="0" max="20" value="${tile.rotatedPoints}" data-index="${index}" data-field="rotatedPoints"
+                 style="width: 60px; padding: 4px; text-align: center;">
+        </td>
+      `;
+    } else if (isRotatable) {
+      rotatedCol = '<td style="padding: 8px; border: 1px solid #ddd; text-align: center; color: #999;">\u2014</td>';
+    }
+
     row.innerHTML = `
       <td style="padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 1.2em;">${tile.letter === 'blank' ? '(Blank)' : tile.letter}</td>
       <td style="padding: 8px; border: 1px solid #ddd;">
@@ -3281,11 +3274,11 @@ function populateTileEditor() {
         <input type="number" min="0" max="20" value="${tile.points}" data-index="${index}" data-field="points"
                style="width: 60px; padding: 4px; text-align: center;">
       </td>
+      ${rotatedCol}
     `;
     tbody.appendChild(row);
   });
 
-  // Add event listeners to inputs
   tbody.querySelectorAll('input').forEach(input => {
     input.addEventListener('input', updateTileValue);
   });
@@ -3318,9 +3311,15 @@ function saveTileDistribution() {
 }
 
 function exportTilesAsCSV() {
-  let csv = 'letter,count,points\n';
+  const tileMode = getCurrentTileMode();
+  const isRotatable = tileMode.startsWith('rotation');
+  let csv = isRotatable ? 'letter,count,points,rotated_points\n' : 'letter,count,points\n';
   customTiles.forEach(tile => {
-    csv += `${tile.letter},${tile.count},${tile.points}\n`;
+    if (isRotatable) {
+      csv += `${tile.letter},${tile.count},${tile.points},${tile.rotatedPoints !== undefined ? tile.rotatedPoints : ''}\n`;
+    } else {
+      csv += `${tile.letter},${tile.count},${tile.points}\n`;
+    }
   });
 
   // Create download link
@@ -3353,17 +3352,25 @@ function importTilesFromCSV() {
         const line = lines[i].trim();
         if (!line) continue;
 
-        const [letter, count, points] = line.split(',');
+        const parts = line.split(',');
+        const letter = parts[0];
+        const count = parts[1];
+        const points = parts[2];
+        const rotatedPoints = parts[3];
 
         if (!letter || count === undefined || points === undefined) {
           throw new Error(`Invalid CSV format at line ${i + 1}`);
         }
 
-        newTiles.push({
+        const tile = {
           letter: letter.trim(),
           count: parseInt(count.trim()),
           points: parseInt(points.trim())
-        });
+        };
+        if (rotatedPoints && rotatedPoints.trim() !== '') {
+          tile.rotatedPoints = parseInt(rotatedPoints.trim());
+        }
+        newTiles.push(tile);
       }
 
       if (newTiles.length === 0) {
