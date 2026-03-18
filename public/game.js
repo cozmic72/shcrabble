@@ -1816,8 +1816,9 @@ function createGame() {
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
   const rules = document.querySelector('input[name="game-rules"]:checked').value;
-  const useRotation = document.getElementById('use-rotation').checked;
-  const useCompounds = !useRotation && document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
+  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const useRotation = tileMode === 'rotation';
+  const useCompounds = tileMode === 'compound';
   const customTileDistribution = getSelectedTileDistribution();
   const timerEnabled = document.getElementById('timer-enabled').checked;
   const timeLimitMinutes = parseInt(document.getElementById('time-limit-minutes').value) || 25;
@@ -2706,19 +2707,6 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('timer-settings').style.display = e.target.checked ? 'block' : 'none';
   });
 
-  // Rotation checkbox toggle - mutually exclusive with compound letters
-  document.getElementById('use-rotation').addEventListener('change', (e) => {
-    const compoundGroup = document.getElementById('compound-letters-group');
-    const compoundRadios = compoundGroup.querySelectorAll('input[type="radio"]');
-    if (e.target.checked) {
-      compoundRadios.forEach(radio => { radio.disabled = true; });
-      compoundGroup.style.opacity = '0.5';
-    } else {
-      compoundRadios.forEach(radio => { radio.disabled = false; });
-      compoundGroup.style.opacity = '1';
-    }
-  });
-
   // Event listeners for dialog confirm buttons
   document.getElementById('create-game-confirm-btn').addEventListener('click', createGame);
   document.getElementById('join-game-confirm-btn').addEventListener('click', joinGame);
@@ -3020,17 +3008,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // Custom tile distribution handlers
   setupCustomTileEditor();
 
-  // Add event listeners for compound mode change to reload custom tiles
-  document.querySelectorAll('input[name="use-compounds"]').forEach(radio => {
+  // Add event listeners for tile mode change to reload custom tiles
+  document.querySelectorAll('input[name="tile-mode"]').forEach(radio => {
     radio.addEventListener('change', () => {
-      const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
-      const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+      const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
+      const storageKey = 'customTiles-' + tileMode;
       const saved = localStorage.getItem(storageKey);
       if (saved) {
         try {
           customTiles = JSON.parse(saved);
         } catch (e) {
-          console.error('Failed to parse custom tiles:', e);
           customTiles = null;
         }
       } else {
@@ -3138,9 +3125,9 @@ function setupCustomTileEditor() {
     exportTilesAsCSV();
   });
 
-  // Load custom tiles from localStorage based on compound mode
-  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
-  const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+  // Load custom tiles from localStorage based on tile mode
+  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const storageKey = 'customTiles-' + tileMode;
   const saved = localStorage.getItem(storageKey);
   if (saved) {
     try {
@@ -3203,8 +3190,8 @@ function updateTotalCount() {
 }
 
 function saveTileDistribution() {
-  const useCompounds = document.querySelector('input[name="use-compounds"]:checked').value === 'compound';
-  const storageKey = useCompounds ? 'customTiles-compound' : 'customTiles-split';
+  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const storageKey = 'customTiles-' + tileMode;
   localStorage.setItem(storageKey, JSON.stringify(customTiles));
   document.getElementById('tile-editor-dialog').style.display = 'none';
   alert('Custom tile distribution saved!');

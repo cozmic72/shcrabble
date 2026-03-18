@@ -108,5 +108,15 @@
   "timeUsed": "Time",
   "pauseTimer": "Pause Timer",
   "resumeTimer": "Resume Timer",
-  "showClock": "Show Clock"
+  "showClock": "Show Clock",
+  "useRotation": "Rotation (tiles can be flipped)",
+  "tileMode": "Tile Mode",
+  "splitMode": "Standard (42 tiles)",
+  "rotationMode": "Rotation (27 flippable tiles)",
+  "compoundMode": "Compound (48 tiles)",
+  "addBot": "Add Bot",
+  "botTierBeginner": "Beginner",
+  "botTierCasual": "Casual",
+  "botTierIntermediate": "Intermediate",
+  "botTierExpert": "Expert"
 }

@@ -108,5 +108,15 @@
   "timeUsed": "𐑑𐑲𐑥",
   "pauseTimer": "𐑐𐑷𐑟 𐑑𐑲𐑥𐑼",
   "resumeTimer": "𐑮𐑦𐑟𐑿𐑥 𐑑𐑲𐑥𐑼",
-  "showClock": "𐑖𐑴 𐑒𐑤𐑪𐑒"
+  "showClock": "𐑖𐑴 𐑒𐑤𐑪𐑒",
+  "useRotation": "𐑮𐑴𐑑𐑱𐑖𐑩𐑯 (𐑑𐑲𐑤𐑟 𐑒𐑨𐑯 𐑚𐑰 𐑓𐑤𐑦𐑐𐑑)",
+  "tileMode": "𐑑𐑲𐑤 𐑥𐑴𐑛",
+  "splitMode": "𐑕𐑑𐑨𐑯𐑛𐑼𐑛 (42 𐑑𐑲𐑤𐑟)",
+  "rotationMode": "𐑮𐑴𐑑𐑱𐑖𐑩𐑯 (27 𐑓𐑤𐑦𐑐𐑩𐑚𐑩𐑤 𐑑𐑲𐑤𐑟)",
+  "compoundMode": "𐑒𐑪𐑥𐑐𐑬𐑯𐑛 (48 𐑑𐑲𐑤𐑟)",
+  "addBot": "𐑨𐑛 𐑚𐑪𐑑",
+  "botTierBeginner": "𐑚𐑦𐑜𐑦𐑯𐑼",
+  "botTierCasual": "𐑒𐑨𐑠𐑫𐑩𐑤",
+  "botTierIntermediate": "𐑦𐑯𐑑𐑼𐑥𐑰𐑛𐑦𐑩𐑑",
+  "botTierExpert": "𐑧𐑒𐑕𐑐𐑻𐑑"
 }
