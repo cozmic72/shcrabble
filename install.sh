@@ -84,10 +84,10 @@ cp -r ai "$INSTALL_DIR/"
 cp package.json "$INSTALL_DIR/"
 cp package-lock.json "$INSTALL_DIR/" 2>/dev/null || true
 
-# Copy dictionary file
-echo "Copying dictionary file..."
-mkdir -p "$INSTALL_DIR/data/readlex"
-cp -r data/readlex "$INSTALL_DIR/data/"
+# Copy data files
+echo "Copying data files..."
+mkdir -p "$INSTALL_DIR/data"
+cp -r data/* "$INSTALL_DIR/data/"
 
 # Install dependencies
 echo "Installing Node.js dependencies..."
