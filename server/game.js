@@ -182,6 +182,56 @@ class Game {
     return null;
   }
 
+  addBot(tierName) {
+    const { TIERS } = require('../ai/player');
+    const tierConfig = TIERS[tierName];
+    if (!tierConfig) {
+      throw new Error('Unknown bot tier: ' + tierName);
+    }
+
+    if (this.locked) {
+      throw new Error('Game is locked - first round is complete');
+    }
+
+    if (this.players.length >= 4) {
+      throw new Error('Game is full');
+    }
+
+    if (!this.tiles) {
+      this.loadTiles();
+    }
+
+    const crypto = require('crypto');
+    const botId = 'bot-' + tierName + '-' + crypto.randomUUID();
+
+    const player = {
+      id: botId,
+      name: 'Bot (' + tierConfig.name + ')',
+      userId: null,
+      score: 0,
+      rack: this.drawTiles(this.rackSize),
+      index: this.players.length,
+      connected: true,
+      hasLeft: false,
+      timeUsed: 0,
+      isBot: true,
+      botTier: tierName
+    };
+
+    this.players.push(player);
+
+    if (this.players.length === 1) {
+      this.ownerId = botId;
+    }
+
+    if (this.players.length === 2 && this.status === 'waiting') {
+      this.status = 'active';
+      this.startTurnTimer();
+    }
+
+    return player;
+  }
+
   addPlayer(playerId, playerName, userId = null) {
     if (this.locked) {
       throw new Error('Game is locked - first round is complete');
@@ -821,6 +871,8 @@ class Game {
         connected: p.connected,
         timeUsed: p.timeUsed || 0,
         hasLeft: p.hasLeft,
+        isBot: p.isBot || false,
+        botTier: p.botTier || null,
         // Send rack to the player themselves OR to spectators
         rack: (forPlayerId === p.id || isSpectator) ? p.rack : undefined
       })),

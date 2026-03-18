@@ -555,6 +555,11 @@ function initSocket() {
   });
 }
 
+function addBot() {
+  const tierName = document.getElementById('bot-tier-select').value;
+  socket.emit('add-bot', { tierName });
+}
+
 // UI Functions
 function showGameScreen() {
   document.getElementById('lobby-screen').style.display = 'none';
@@ -682,6 +687,16 @@ function updateGameUI() {
   } else {
     leaveGameBtn.style.display = 'inline-block';
   }
+
+  // Show/hide bot controls (only in waiting state for the game owner)
+  const botControls = document.getElementById('bot-controls');
+  if (botControls) {
+    if (gameState.status === 'waiting' && isOwner && gameState.players.length < 4) {
+      botControls.style.display = 'block';
+    } else {
+      botControls.style.display = 'none';
+    }
+  }
 }
 
 // Helper function to format time in MM:SS
@@ -759,6 +774,7 @@ function updatePlayersList() {
     const scoreLabel = i18n.t('score');
     const tilesLabel = i18n.t('tiles');
     const statusLabel = player.hasLeft ? ' (left)' : (player.connected ? '' : ' (disconnected)');
+    const botLabel = player.isBot ? ' 🤖' : '';
     const isOwner = player.id === gameState.ownerId ? ' 👑' : '';
     const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
     const isGameOwner = gameState.ownerId === playerId;
@@ -794,7 +810,7 @@ function updatePlayersList() {
     }
 
     card.innerHTML = `
-      <div class="player-name">${player.name}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${statusLabel}</div>
+      <div class="player-name">${player.name}${botLabel}${isOwner}${idx === gameState.currentPlayerIndex ? ' ⬅' : ''}${statusLabel}</div>
       <div class="player-score">${scoreLabel}: ${player.score}</div>
       <div class="player-score">${tilesLabel}: ${player.rackCount}</div>
       ${timeDisplay}

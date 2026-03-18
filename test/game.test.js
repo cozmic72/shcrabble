@@ -588,4 +588,103 @@ describe('Game - Serialization', () => {
     const restored = Game.deserialize('test-game', data);
     assert.equal(restored.players.length, 2);
   });
+
+  it('bot properties preserved through serialize/deserialize', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    game.addBot('casual');
+
+    const json = game.serialize();
+    const restored = Game.deserialize('test-game', json);
+
+    assert.equal(restored.players.length, 2);
+    assert.equal(restored.players[1].isBot, true);
+    assert.equal(restored.players[1].botTier, 'casual');
+    assert.equal(restored.players[1].name, 'Bot (Casual)');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Bot player management
+// ---------------------------------------------------------------------------
+
+describe('Game - Bot management', () => {
+  it('addBot() creates a bot player with correct properties', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    const bot = game.addBot('intermediate');
+
+    assert.equal(bot.isBot, true);
+    assert.equal(bot.botTier, 'intermediate');
+    assert.equal(bot.name, 'Bot (Intermediate)');
+    assert.ok(bot.id.startsWith('bot-intermediate-'));
+    assert.equal(bot.rack.length, 9);
+    assert.equal(bot.score, 0);
+    assert.equal(bot.connected, true);
+  });
+
+  it('addBot() starts game when 2nd player is a bot', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    assert.equal(game.status, 'waiting');
+    game.addBot('beginner');
+    assert.equal(game.status, 'active');
+  });
+
+  it('addBot() rejects unknown tier', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    assert.throws(() => game.addBot('godlike'), /Unknown bot tier/);
+  });
+
+  it('addBot() rejects when game is full', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'A');
+    game.addPlayer('p2', 'B');
+    game.addPlayer('p3', 'C');
+    game.addPlayer('p4', 'D');
+    assert.throws(() => game.addBot('casual'), /Game is full/);
+  });
+
+  it('addBot() rejects when game is locked', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    game.addBot('casual');
+    game.locked = true;
+    assert.throws(() => game.addBot('expert'), /Game is locked/);
+  });
+
+  it('getState() includes isBot and botTier', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    game.addBot('expert');
+
+    const state = game.getState('p1');
+    assert.equal(state.players[0].isBot, false);
+    assert.equal(state.players[0].botTier, null);
+    assert.equal(state.players[1].isBot, true);
+    assert.equal(state.players[1].botTier, 'expert');
+  });
+
+  it('removePlayer() works for bots', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    const bot = game.addBot('casual');
+
+    const result = game.removePlayer(bot.id);
+    assert.ok(result);
+    assert.equal(game.players.length, 1);
+    assert.equal(game.status, 'waiting');
+  });
+
+  it('multiple bots can be added', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    game.addBot('beginner');
+    game.addBot('expert');
+    game.addBot('casual');
+
+    assert.equal(game.players.length, 4);
+    assert.equal(game.players.filter(p => p.isBot).length, 3);
+  });
 });

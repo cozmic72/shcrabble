@@ -7,6 +7,9 @@ const crypto = require('crypto');
 const Game = require('./game');
 const Dictionary = require('./dictionary');
 const db = require('./db');
+const Trie = require('../ai/trie');
+const { AIPlayer, TIERS } = require('../ai/player');
+const { ALPHABETS, buildWordList } = require('../ai/alphabet');
 
 // Use Node's built-in UUID generator
 const uuidv4 = () => crypto.randomUUID();
@@ -40,6 +43,187 @@ const pendingVotes = new Map(); // voteId -> { gameId, playerId, playerName, pla
 
 // Initialize dictionary
 const dictionary = new Dictionary();
+
+// AI bot infrastructure
+const trieCache = new Map();
+
+function getOrBuildTrie(alphabet, vocabSize) {
+  const key = alphabet.name + ':' + (vocabSize || 'full');
+  if (trieCache.has(key)) return trieCache.get(key);
+  const readlexPath = path.join(__dirname, '..', 'data', 'readlex', 'readlex.json');
+  const wordList = buildWordList(readlexPath, alphabet, vocabSize || undefined);
+  const trie = new Trie();
+  for (const word of wordList) trie.insert(word);
+  trieCache.set(key, trie);
+  return trie;
+}
+
+function getAlphabetForGame(game) {
+  if (game.useRotation) return ALPHABETS['rotatable'];
+  if (game.useCompounds) return ALPHABETS['compound'];
+  return ALPHABETS['split'];
+}
+
+function tagRotationInfoOnRack(game, playerIndex) {
+  const alphabet = getAlphabetForGame(game);
+  if (!alphabet.rotationPairs) return;
+
+  const tileRotationInfo = new Map();
+  if (game.tiles) {
+    for (const t of game.tiles) {
+      if (t.isRotatable) {
+        tileRotationInfo.set(t.letter, {
+          rotatedLetter: t.rotatedLetter,
+          rotatedPoints: t.rotatedPoints,
+        });
+      }
+    }
+  }
+
+  if (tileRotationInfo.size === 0) return;
+
+  for (const tile of game.players[playerIndex].rack) {
+    if (tile.isBlank) continue;
+    const rotInfo = tileRotationInfo.get(tile.letter);
+    if (rotInfo) {
+      tile.isRotatable = true;
+      tile.rotatedLetter = rotInfo.rotatedLetter;
+      tile.rotatedPoints = rotInfo.rotatedPoints;
+    }
+  }
+}
+
+function handleRotationSwap(game, move) {
+  const rotatedPlacements = [];
+  if (!game.useRotation) return rotatedPlacements;
+
+  for (let i = 0; i < move.placements.length; i++) {
+    const p = move.placements[i];
+    if (p.primaryLetter) {
+      rotatedPlacements.push({ index: i, originalLetter: p.letter, row: p.row, col: p.col });
+      p.letter = p.primaryLetter;
+    }
+  }
+  return rotatedPlacements;
+}
+
+function restoreRotatedLetters(game, rotatedPlacements, move) {
+  for (const rp of rotatedPlacements) {
+    game.board[rp.row][rp.col].letter = rp.originalLetter;
+    move.placements[rp.index].letter = rp.originalLetter;
+  }
+}
+
+async function broadcastGameState(game, extra = {}) {
+  const sockets = await io.in(game.gameId).fetchSockets();
+  for (const s of sockets) {
+    s.emit('game-update', {
+      gameState: game.getState(s.data.isSpectator ? null : s.data.playerId),
+      ...extra
+    });
+  }
+}
+
+async function saveGame(game) {
+  try {
+    await db.query(
+      'UPDATE sessions SET game_state = ?, current_turn = ?, status = ? WHERE id = ?',
+      [game.serialize(), game.currentPlayerIndex, game.status, game.gameId]
+    );
+  } catch (err) {
+    console.error('Error saving game after bot turn:', err);
+  }
+}
+
+function scheduleBotTurnIfNeeded(game) {
+  if (game.status !== 'active') return;
+  const currentPlayer = game.getCurrentPlayer();
+  if (!currentPlayer || !currentPlayer.isBot) return;
+
+  const delay = 800 + Math.random() * 700;
+
+  setTimeout(() => {
+    if (game.status !== 'active') return;
+    executeBotTurn(game);
+  }, delay);
+}
+
+async function executeBotTurn(game) {
+  const pi = game.currentPlayerIndex;
+  const player = game.players[pi];
+  if (!player.isBot) return;
+
+  const alphabet = getAlphabetForGame(game);
+  const tierConfig = TIERS[player.botTier];
+  const trie = getOrBuildTrie(alphabet, tierConfig.vocabSize);
+  const ai = new AIPlayer(trie, tierConfig, alphabet);
+
+  if (game.useRotation) {
+    tagRotationInfoOnRack(game, pi);
+  }
+
+  const rack = player.rack;
+  const move = ai.findBestMove(game.board, rack, game.tileBag.length);
+
+  if (move && move.exchange) {
+    try {
+      game.exchangeTiles(pi, move.indices);
+    } catch (_) {}
+    game.consecutiveScorelessTurns++;
+    game.nextTurn();
+    await broadcastGameState(game, { botAction: 'exchange', playerName: player.name });
+  } else if (move) {
+    const rotatedPlacements = handleRotationSwap(game, move);
+
+    try {
+      game.placeTiles(pi, move.placements);
+      restoreRotatedLetters(game, rotatedPlacements, move);
+      player.score += move.score;
+      game.consecutiveScorelessTurns = 0;
+
+      if (game.tileBag.length === 0 && player.rack.length === 0) {
+        game.applyEndgameScoring();
+        game.status = 'completed';
+      }
+    } catch (_) {
+      // Restore rotated letters before continuing
+      for (const rp of rotatedPlacements) {
+        move.placements[rp.index].letter = rp.originalLetter;
+      }
+      game.consecutiveScorelessTurns++;
+    }
+
+    game.nextTurn();
+    await broadcastGameState(game, {
+      lastMove: { playerName: player.name, score: move.score, placements: move.placements }
+    });
+  } else {
+    game.consecutiveScorelessTurns++;
+    if (game.consecutiveScorelessTurns >= game.players.length * 2) {
+      game.applyEndgameScoring();
+      game.status = 'completed';
+    }
+    game.nextTurn();
+    await broadcastGameState(game, { botAction: 'pass', playerName: player.name });
+  }
+
+  await saveGame(game);
+
+  if (game.status === 'completed') {
+    const finalScores = game.players.map(p => ({
+      name: p.name,
+      score: p.score
+    })).sort((a, b) => b.score - a.score);
+
+    const sockets = await io.in(game.gameId).fetchSockets();
+    for (const s of sockets) {
+      s.emit('game-ended', { finalScores });
+    }
+    return;
+  }
+
+  scheduleBotTurnIfNeeded(game);
+}
 
 // Parse JSON bodies
 app.use(express.json());
@@ -484,6 +668,8 @@ async function completeVote(vote, voteId, gameId, acceptVotes, totalVoters) {
           }
         });
       }
+
+      scheduleBotTurnIfNeeded(game);
     }
   } else {
     // Reject the move
@@ -724,8 +910,58 @@ io.on('connection', (socket) => {
       }
 
       console.log(`Player ${playerName} joined game ${gameId}`);
+
+      if (game.status === 'active') {
+        scheduleBotTurnIfNeeded(game);
+      }
     } catch (err) {
       console.error('Error joining game:', err);
+      socket.emit('error', { message: err.message });
+    }
+  });
+
+  // Add bot player
+  socket.on('add-bot', async ({ tierName }) => {
+    try {
+      const { gameId, playerId } = socket.data;
+      const game = games.get(gameId);
+
+      if (!game) {
+        socket.emit('error', { message: 'Game not found' });
+        return;
+      }
+
+      if (game.status !== 'waiting') {
+        socket.emit('error', { message: 'Game already started' });
+        return;
+      }
+
+      if (!TIERS[tierName]) {
+        socket.emit('error', { message: 'Unknown tier: ' + tierName });
+        return;
+      }
+
+      if (game.players.length >= 4) {
+        socket.emit('error', { message: 'Game is full' });
+        return;
+      }
+
+      const bot = game.addBot(tierName);
+
+      await db.query(
+        'UPDATE sessions SET game_state = ?, status = ? WHERE id = ?',
+        [game.serialize(), game.status, gameId]
+      );
+
+      await broadcastGameState(game);
+
+      if (game.status === 'active') {
+        scheduleBotTurnIfNeeded(game);
+      }
+
+      console.log(`Bot ${bot.name} added to game ${gameId}`);
+    } catch (err) {
+      console.error('Error adding bot:', err);
       socket.emit('error', { message: err.message });
     }
   });
@@ -839,6 +1075,8 @@ io.on('connection', (socket) => {
             }
           });
         }
+
+        scheduleBotTurnIfNeeded(game);
       }
 
     } catch (err) {
@@ -1078,6 +1316,8 @@ io.on('connection', (socket) => {
 
       console.log(`Player ${player.name} exchanged ${indices.length} tiles`);
 
+      scheduleBotTurnIfNeeded(game);
+
     } catch (err) {
       console.error('Error exchanging tiles:', err);
       socket.emit('error', { message: err.message });
@@ -1129,6 +1369,8 @@ io.on('connection', (socket) => {
           });
         }
       }
+
+      scheduleBotTurnIfNeeded(game);
 
     } catch (err) {
       console.error('Error passing turn:', err);
