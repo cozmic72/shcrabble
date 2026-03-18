@@ -48,8 +48,16 @@ class Game {
     this.rackSize = options.rackSize || 9; // Customizable rack size
     this.allowVoting = options.allowVoting !== undefined ? options.allowVoting : true; // Allow voting on invalid words
     this.rules = options.rules || 'casual'; // 'casual' or 'tournament'
-    this.useCompounds = options.useCompounds || false; // Use compound letters (𐑼, 𐑽, etc.)
-    this.useRotation = options.useRotation || false; // Use rotatable tiles
+    // Determine tile mode from options (with backwards compatibility)
+    if (options.tileMode) {
+      this.tileMode = options.tileMode;
+    } else if (options.useRotation) {
+      this.tileMode = 'rotation';
+    } else if (options.useCompounds) {
+      this.tileMode = 'compound'; // legacy, will gracefully degrade
+    } else {
+      this.tileMode = 'rotation'; // new default
+    }
     this.customTiles = options.customTiles || null; // Custom tile distribution
     this.consecutiveScorelessTurns = 0; // Track consecutive passes/exchanges for endgame
 
@@ -60,11 +68,19 @@ class Game {
     this.turnStartTime = null; // Timestamp when current turn started
   }
 
+  get useRotation() { return this.tileMode === 'rotation' || this.tileMode === 'rotation-extended'; }
+  get useCompounds() { return false; } // compound mode removed
+
   // Load tile definitions and metadata from CSV (without initializing tileBag)
   loadTileInfo() {
-    let filename = 'tiles.csv';
-    if (this.useRotation) filename = 'tiles-rotatable.csv';
-    else if (this.useCompounds) filename = 'tiles-compound.csv';
+    const TILE_FILES = {
+      'split': 'tiles.csv',
+      'split-extended': 'tiles-extended.csv',
+      'rotation': 'tiles-rotatable.csv',
+      'rotation-extended': 'tiles-rotatable-extended.csv',
+      'compound': 'tiles.csv', // fallback for old compound games -> use split
+    };
+    const filename = TILE_FILES[this.tileMode] || 'tiles-rotatable.csv';
 
     const tilesPath = path.join(__dirname, '../data', filename);
     const content = fs.readFileSync(tilesPath, 'utf8');
@@ -890,7 +906,7 @@ class Game {
         rackSize: this.rackSize,
         allowVoting: this.allowVoting,
         rules: this.rules,
-        useCompounds: this.useCompounds,
+        tileMode: this.tileMode,
         useRotation: this.useRotation,
         customTiles: this.customTiles,
         totalTiles: this.tiles ? this.tiles.reduce((sum, t) => sum + t.count, 0) : 100,
@@ -931,8 +947,7 @@ class Game {
       rackSize: this.rackSize,
       allowVoting: this.allowVoting,
       rules: this.rules,
-      useCompounds: this.useCompounds,
-      useRotation: this.useRotation,
+      tileMode: this.tileMode,
       consecutiveScorelessTurns: this.consecutiveScorelessTurns,
       customTiles: this.customTiles,
       timerEnabled: this.timerEnabled,
@@ -946,12 +961,23 @@ class Game {
     // MySQL returns JSON columns as objects, not strings
     const state = typeof data === 'string' ? JSON.parse(data) : data;
 
+    // Derive tileMode from old boolean flags if not present
+    let tileMode;
+    if (state.tileMode) {
+      tileMode = state.tileMode;
+    } else if (state.useRotation) {
+      tileMode = 'rotation';
+    } else if (state.useCompounds) {
+      tileMode = 'split'; // old compound games degrade to split
+    } else {
+      tileMode = 'split';
+    }
+
     const options = {
       rackSize: state.rackSize || 9,
       allowVoting: state.allowVoting !== undefined ? state.allowVoting : true,
       rules: state.rules || 'casual',
-      useCompounds: state.useCompounds || false,
-      useRotation: state.useRotation || false,
+      tileMode,
       customTiles: state.customTiles || null,
       timerEnabled: state.timerEnabled || false,
       timeLimit: state.timeLimit || 25 * 60

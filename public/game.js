@@ -247,12 +247,11 @@ function initSocket() {
       document.getElementById('invite-link').value = inviteLink;
     }
 
-    // Show welcome dialog on first visit (but skip if using compound mode)
+    // Show welcome dialog on first visit
     const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
-    const usesCompounds = gameState.config?.useCompounds || false;
     isReconnection = data.reconnected || false;
 
-    if (!hideWelcome && !usesCompounds) {
+    if (!hideWelcome) {
       document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
       document.getElementById('welcome-dialog').style.display = 'flex';
     } else if (isOwner && !isReconnection) {
@@ -1816,9 +1815,9 @@ function createGame() {
   const rackSize = parseInt(document.getElementById('rack-size').value);
   const allowVoting = document.getElementById('allow-voting').checked;
   const rules = document.querySelector('input[name="game-rules"]:checked').value;
-  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
-  const useRotation = tileMode === 'rotation';
-  const useCompounds = tileMode === 'compound';
+  const baseMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const useExtended = document.getElementById('use-extended').checked;
+  const tileMode = useExtended ? baseMode + '-extended' : baseMode;
   const customTileDistribution = getSelectedTileDistribution();
   const timerEnabled = document.getElementById('timer-enabled').checked;
   const timeLimitMinutes = parseInt(document.getElementById('time-limit-minutes').value) || 25;
@@ -1844,8 +1843,7 @@ function createGame() {
       rackSize,
       allowVoting,
       rules,
-      useCompounds,
-      useRotation,
+      tileMode,
       customTiles: customTileDistribution,
       timerEnabled,
       timeLimit: timeLimitMinutes * 60 // Convert to seconds
@@ -3008,23 +3006,28 @@ document.addEventListener('DOMContentLoaded', () => {
   // Custom tile distribution handlers
   setupCustomTileEditor();
 
-  // Add event listeners for tile mode change to reload custom tiles
-  document.querySelectorAll('input[name="tile-mode"]').forEach(radio => {
-    radio.addEventListener('change', () => {
-      const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
-      const storageKey = 'customTiles-' + tileMode;
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        try {
-          customTiles = JSON.parse(saved);
-        } catch (e) {
-          customTiles = null;
-        }
-      } else {
+  // Reload custom tiles when tile mode or extended checkbox changes
+  function reloadCustomTilesForMode() {
+    const baseMode = document.querySelector('input[name="tile-mode"]:checked').value;
+    const useExtended = document.getElementById('use-extended').checked;
+    const tileMode = useExtended ? baseMode + '-extended' : baseMode;
+    const storageKey = 'customTiles-' + tileMode;
+    const saved = localStorage.getItem(storageKey);
+    if (saved) {
+      try {
+        customTiles = JSON.parse(saved);
+      } catch (e) {
         customTiles = null;
       }
-    });
+    } else {
+      customTiles = null;
+    }
+  }
+
+  document.querySelectorAll('input[name="tile-mode"]').forEach(radio => {
+    radio.addEventListener('change', reloadCustomTilesForMode);
   });
+  document.getElementById('use-extended').addEventListener('change', reloadCustomTilesForMode);
 
   // Initialize i18n
   i18n.init().then(() => {
@@ -3126,8 +3129,10 @@ function setupCustomTileEditor() {
   });
 
   // Load custom tiles from localStorage based on tile mode
-  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
-  const storageKey = 'customTiles-' + tileMode;
+  const initBaseMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const initExtended = document.getElementById('use-extended').checked;
+  const initTileMode = initExtended ? initBaseMode + '-extended' : initBaseMode;
+  const storageKey = 'customTiles-' + initTileMode;
   const saved = localStorage.getItem(storageKey);
   if (saved) {
     try {
@@ -3190,7 +3195,9 @@ function updateTotalCount() {
 }
 
 function saveTileDistribution() {
-  const tileMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const baseMode = document.querySelector('input[name="tile-mode"]:checked').value;
+  const useExtended = document.getElementById('use-extended').checked;
+  const tileMode = useExtended ? baseMode + '-extended' : baseMode;
   const storageKey = 'customTiles-' + tileMode;
   localStorage.setItem(storageKey, JSON.stringify(customTiles));
   document.getElementById('tile-editor-dialog').style.display = 'none';

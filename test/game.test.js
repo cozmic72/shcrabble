@@ -93,17 +93,17 @@ describe('Game - Tile loading', () => {
     assert.equal(game.tileBag.length, expectedTotal);
   });
 
-  it('loadTiles() with useCompounds loads tiles-compound.csv', () => {
-    const game = makeGame({ useCompounds: true });
+  it('loadTiles() with split-extended loads tiles-extended.csv', () => {
+    const game = makeGame({ tileMode: 'split-extended' });
     game.loadTiles();
-    // compound CSV has additional compound letters
-    assert.ok(game.tiles.some(t => t.letter === '\u{10480}' || t.letter === '\u{1047C}' || t.letter !== ''));
-    // Just verify it loaded more tile types than standard
     assert.ok(game.tiles.length > 0);
+    // split-extended should not have rotatable tiles
+    const rotatable = game.tileBag.find(t => t.isRotatable);
+    assert.equal(rotatable, undefined);
   });
 
   it('loadTiles() with useRotation loads tiles-rotatable.csv with rotation properties', () => {
-    const game = makeGame({ useRotation: true });
+    const game = makeGame({ tileMode: 'rotation' });
     game.loadTiles();
     // Rotatable tiles should have isRotatable, rotatedLetter, rotatedPoints
     const rotatableTile = game.tileBag.find(t => t.isRotatable);
@@ -544,7 +544,7 @@ describe('Game - Serialization', () => {
   });
 
   it('deserialize() restores game state correctly', () => {
-    const game = makeGame({ rackSize: 7, rules: 'tournament', useRotation: false });
+    const game = makeGame({ rackSize: 7, rules: 'tournament', tileMode: 'split' });
     addTwoPlayers(game);
     game.players[0].score = 42;
     game.consecutiveScorelessTurns = 2;
@@ -566,7 +566,7 @@ describe('Game - Serialization', () => {
   });
 
   it('rotation properties preserved through serialize/deserialize', () => {
-    const game = makeGame({ useRotation: true });
+    const game = makeGame({ tileMode: 'rotation' });
     addTwoPlayers(game);
 
     const json = game.serialize();
@@ -686,5 +686,118 @@ describe('Game - Bot management', () => {
 
     assert.equal(game.players.length, 4);
     assert.equal(game.players.filter(p => p.isBot).length, 3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tile mode
+// ---------------------------------------------------------------------------
+
+describe('Game - tileMode', () => {
+  it('defaults to rotation when no options given', () => {
+    const game = makeGame();
+    assert.equal(game.tileMode, 'rotation');
+    assert.equal(game.useRotation, true);
+    assert.equal(game.useCompounds, false);
+  });
+
+  it('accepts explicit tileMode option', () => {
+    const game = makeGame({ tileMode: 'split' });
+    assert.equal(game.tileMode, 'split');
+    assert.equal(game.useRotation, false);
+  });
+
+  it('accepts split-extended tileMode', () => {
+    const game = makeGame({ tileMode: 'split-extended' });
+    assert.equal(game.tileMode, 'split-extended');
+    assert.equal(game.useRotation, false);
+  });
+
+  it('accepts rotation-extended tileMode', () => {
+    const game = makeGame({ tileMode: 'rotation-extended' });
+    assert.equal(game.tileMode, 'rotation-extended');
+    assert.equal(game.useRotation, true);
+  });
+
+  it('useCompounds getter always returns false', () => {
+    const game = makeGame({ tileMode: 'compound' });
+    assert.equal(game.useCompounds, false);
+  });
+
+  it('backwards compat: useRotation option maps to rotation tileMode', () => {
+    const game = makeGame({ useRotation: true });
+    assert.equal(game.tileMode, 'rotation');
+    assert.equal(game.useRotation, true);
+  });
+
+  it('backwards compat: useCompounds option maps to compound tileMode', () => {
+    const game = makeGame({ useCompounds: true });
+    assert.equal(game.tileMode, 'compound');
+  });
+
+  it('tileMode preserved through serialize/deserialize', () => {
+    const game = makeGame({ tileMode: 'split-extended' });
+    addTwoPlayers(game);
+
+    const json = game.serialize();
+    const restored = Game.deserialize('test-game', json);
+
+    assert.equal(restored.tileMode, 'split-extended');
+    assert.equal(restored.useRotation, false);
+  });
+
+  it('deserialize old useRotation saves as rotation tileMode', () => {
+    // Simulate old serialized state with no tileMode but useRotation: true
+    const oldState = {
+      board: makeGame().board,
+      players: [],
+      spectators: [],
+      currentPlayerIndex: 0,
+      tileBag: [],
+      status: 'waiting',
+      locked: false,
+      turnsTaken: 0,
+      ownerId: null,
+      rackSize: 9,
+      allowVoting: true,
+      rules: 'casual',
+      useRotation: true,
+      consecutiveScorelessTurns: 0,
+    };
+
+    const restored = Game.deserialize('test-game', oldState);
+    assert.equal(restored.tileMode, 'rotation');
+    assert.equal(restored.useRotation, true);
+  });
+
+  it('deserialize old useCompounds saves as split tileMode', () => {
+    const oldState = {
+      board: makeGame().board,
+      players: [],
+      spectators: [],
+      currentPlayerIndex: 0,
+      tileBag: [],
+      status: 'waiting',
+      locked: false,
+      turnsTaken: 0,
+      ownerId: null,
+      rackSize: 9,
+      allowVoting: true,
+      rules: 'casual',
+      useCompounds: true,
+      consecutiveScorelessTurns: 0,
+    };
+
+    const restored = Game.deserialize('test-game', oldState);
+    assert.equal(restored.tileMode, 'split');
+    assert.equal(restored.useCompounds, false);
+  });
+
+  it('compound tileMode loads tiles.csv as fallback', () => {
+    const game = makeGame({ tileMode: 'compound' });
+    game.loadTiles();
+    // Should load successfully using tiles.csv fallback
+    assert.ok(game.tiles.length > 0);
+    assert.ok(game.tileBag.length > 0);
   });
 });

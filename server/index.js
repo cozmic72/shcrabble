@@ -59,9 +59,14 @@ function getOrBuildTrie(alphabet, vocabSize) {
 }
 
 function getAlphabetForGame(game) {
-  if (game.useRotation) return ALPHABETS['rotatable'];
-  if (game.useCompounds) return ALPHABETS['compound'];
-  return ALPHABETS['split'];
+  const map = {
+    'split': 'split',
+    'split-extended': 'split-extended',
+    'rotation': 'rotatable',
+    'rotation-extended': 'rotatable-extended',
+    'compound': 'split', // fallback for old compound games
+  };
+  return ALPHABETS[map[game.tileMode] || 'rotatable'];
 }
 
 function tagRotationInfoOnRack(game, playerIndex) {
@@ -545,8 +550,7 @@ app.post('/shcrabble/api/create', async (req, res) => {
       rackSize = 9,
       allowVoting = true,
       rules = 'casual',
-      useCompounds = false,
-      useRotation = false,
+      tileMode = 'rotation',
       customTiles = null,
       timerEnabled = false,
       timeLimit = 25 * 60 // Default 25 minutes in seconds
@@ -556,8 +560,7 @@ app.post('/shcrabble/api/create', async (req, res) => {
       rackSize,
       allowVoting,
       rules,
-      useCompounds,
-      useRotation,
+      tileMode,
       customTiles,
       timerEnabled,
       timeLimit

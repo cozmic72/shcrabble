@@ -249,7 +249,7 @@
 
         <div class="setting-item">
           <label data-i18n="tileMode">Tile Mode</label>
-          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 5px;">
+          <div style="display: flex; gap: 20px; margin-top: 5px;">
             <label class="radio-label">
               <input type="radio" name="tile-mode" value="rotation" checked>
               <span data-i18n="rotationMode">Rotation (27 flippable tiles)</span>
@@ -258,16 +258,18 @@
               <input type="radio" name="tile-mode" value="split">
               <span data-i18n="splitMode">Standard (42 tiles)</span>
             </label>
-            <label class="radio-label">
-              <input type="radio" name="tile-mode" value="compound">
-              <span data-i18n="compoundMode">Compound (48 tiles)</span>
-            </label>
           </div>
         </div>
 
         <details style="margin-top: 15px;">
           <summary style="cursor: pointer; font-weight: bold; padding: 10px 0;" data-i18n="advancedSettings">Advanced Settings</summary>
           <div style="margin-top: 10px;">
+            <div class="setting-item">
+              <label style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="use-extended" style="width: 20px; height: 20px;">
+                <span data-i18n="useExtended">Extended alphabet (yea & oevre)</span>
+              </label>
+            </div>
             <div class="setting-item">
               <label>Tile Distribution</label>
               <div style="display: flex; gap: 20px; margin-top: 5px;">
