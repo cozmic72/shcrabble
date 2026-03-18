@@ -847,7 +847,6 @@ function updatePlayersList() {
     const isAdmin = sessionStorage.getItem('shcrabble-adminMode') === 'true';
     const isGameOwner = gameState.ownerId === playerId;
     const canRemove = (isGameOwner || isAdmin) && player.id !== playerId && !player.hasLeft;
-    console.log(`Player ${player.name}: ownerId=${gameState.ownerId}, myId=${playerId}, isAdmin=${isAdmin}, canRemove=${canRemove}`);
     const removeBtn = canRemove
       ? `<button class="remove-player-btn" data-player-id="${player.id}">Remove</button>`
       : '';
