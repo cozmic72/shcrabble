@@ -21,6 +21,7 @@ let lastPlacementPosition = null; // Track last tile placement for double-click 
 let lastMovePlacements = []; // Track placements from last move for highlighting
 let highlightFadeTimeout = null; // Timeout for fading highlight
 let watchedPlayerId = null; // For spectators: which player's rack to display
+const opponentPreviews = new Map(); // playerIndex -> [{row, col, letter}]
 
 // Touch support for mobile
 let touchDraggedElement = null;
@@ -276,6 +277,9 @@ function initSocket() {
 
     gameState = data.gameState;
 
+    // Clear opponent previews when game state updates (move was applied)
+    opponentPreviews.clear();
+
     // Restart timer updates if timer config changed
     startTimerUpdates();
 
@@ -366,6 +370,34 @@ function initSocket() {
     showMessage(i18n.t('playerDisconnected', { name: data.playerName }), 'info');
     gameState = data.gameState;
     updatePlayersList();
+  });
+
+  socket.on('opponent-preview', (data) => {
+    if (data.playerIndex === playerIndex) return; // Ignore our own previews
+
+    // Check for conflicts with our ghost placements
+    if (data.placements.length > 0) {
+      let hadConflict = false;
+      for (const p of data.placements) {
+        const conflictIdx = currentPlacements.findIndex(cp => cp.row === p.row && cp.col === p.col);
+        if (conflictIdx !== -1) {
+          recallSingleTile(currentPlacements[conflictIdx]);
+          currentPlacements.splice(conflictIdx, 1);
+          hadConflict = true;
+        }
+      }
+      if (hadConflict) {
+        updateRack();
+        emitTilePreview();
+      }
+    }
+
+    if (data.placements.length === 0) {
+      opponentPreviews.delete(data.playerIndex);
+    } else {
+      opponentPreviews.set(data.playerIndex, data.placements);
+    }
+    updateBoard();
   });
 
   socket.on('player-reconnected', (data) => {
@@ -1023,6 +1055,19 @@ function updateBoard() {
       }
     }
   }
+
+  // Render opponent preview tiles
+  for (const [pi, placements] of opponentPreviews) {
+    for (const p of placements) {
+      const square = boardDiv.children[p.row * 15 + p.col];
+      if (square && !square.querySelector('.placed-tile') && !square.classList.contains('occupied')) {
+        const preview = document.createElement('div');
+        preview.className = 'opponent-preview-tile';
+        preview.textContent = p.letter;
+        square.appendChild(preview);
+      }
+    }
+  }
 }
 
 function handleGhostToRealConversion() {
@@ -1285,6 +1330,7 @@ function handleSquareClick(row, col) {
     updateBoard();
     updateGameUI();
     validateCurrentMove();
+    emitTilePreview();
     return;
   }
 
@@ -1523,6 +1569,7 @@ function handleTouchEnd(e) {
         updateBoard();
         updateGameUI();
         validateCurrentMove();
+        emitTilePreview();
       }
     }
   }
@@ -1539,6 +1586,7 @@ function handleTouchEnd(e) {
       updateBoard();
       updateGameUI();
       validateCurrentMove();
+      emitTilePreview();
     }
   }
 
@@ -1990,6 +2038,7 @@ function selectBlankLetter(letter) {
   updateBoard();
   updateGameUI();
   validateCurrentMove();
+  emitTilePreview();
 }
 
 // Find next unambiguous position after last placement for double-click
@@ -2122,6 +2171,7 @@ function handleTileDoubleClick(rackIndex) {
   updateBoard();
   updateGameUI();
   validateCurrentMove();
+  emitTilePreview();
 }
 
 function validateCurrentMove() {
@@ -2234,6 +2284,31 @@ function readWordFromBoard(board, row, col, horizontal) {
   return word;
 }
 
+function emitTilePreview() {
+  if (!socket) return;
+  socket.emit('tile-preview', {
+    placements: currentPlacements.map(p => ({ row: p.row, col: p.col, letter: p.letter }))
+  });
+}
+
+function recallSingleTile(placement) {
+  const myPlayer = gameState.players.find(p => p.id === playerId);
+  if (!myPlayer) return;
+
+  // Return the tile to the rack
+  const tile = {
+    letter: placement.isBlank ? '' : placement.letter,
+    points: placement.points,
+    isBlank: placement.isBlank || false
+  };
+  // Re-add rotation info if it was a rotated tile
+  if (placement.isRotated) {
+    tile.isRotatable = true;
+    tile.isRotated = true;
+  }
+  myPlayer.rack.splice(placement.rackIndex, 0, tile);
+}
+
 function submitMove() {
   // Only submit real (non-ghost) placements
   const realPlacements = currentPlacements.filter(p => !p.isGhost);
@@ -2249,6 +2324,9 @@ function submitMove() {
   socket.emit('make-move', {
     placements: realPlacements
   });
+
+  // Clear preview since we're submitting
+  socket.emit('tile-preview', { placements: [] });
 
   // Play submit sound
   if (window.sounds) sounds.moveSubmitted();
@@ -2340,6 +2418,7 @@ function recallTiles() {
   updateGameUI();
   showMessage(i18n.t('msgTilesRecalled'), '');
   validateCurrentMove();
+  emitTilePreview();
 
   // Clear recall flag after animations complete to ensure no unwanted slide-in
   setTimeout(() => {
@@ -2831,6 +2910,7 @@ document.addEventListener('DOMContentLoaded', () => {
       updateBoard();
       updateGameUI();
       validateCurrentMove();
+      emitTilePreview();
       return;
     }
 
@@ -2906,6 +2986,7 @@ document.addEventListener('DOMContentLoaded', () => {
     updateBoard();
     updateGameUI();
     validateCurrentMove();
+    emitTilePreview();
   });
 
   // Burger menu handlers

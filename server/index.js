@@ -153,6 +153,30 @@ function scheduleBotTurnIfNeeded(game) {
   }, delay);
 }
 
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function emitBotPreviewAnimation(game, pi, placements) {
+  for (let i = 0; i < placements.length; i++) {
+    const partial = placements.slice(0, i + 1).map(p => ({
+      row: p.row, col: p.col, letter: p.letter
+    }));
+    io.to(game.gameId).emit('opponent-preview', {
+      playerIndex: pi,
+      placements: partial
+    });
+    await sleep(200);
+  }
+  // Brief pause after all tiles shown before applying move
+  await sleep(300);
+  // Clear preview
+  io.to(game.gameId).emit('opponent-preview', {
+    playerIndex: pi,
+    placements: []
+  });
+}
+
 async function executeBotTurn(game) {
   const pi = game.currentPlayerIndex;
   const player = game.players[pi];
@@ -178,6 +202,9 @@ async function executeBotTurn(game) {
     game.nextTurn();
     await broadcastGameState(game, { botAction: 'exchange', playerName: player.name });
   } else if (move) {
+    // Animate bot tile placements one by one before applying
+    await emitBotPreviewAnimation(game, pi, move.placements);
+
     const rotatedPlacements = handleRotationSwap(game, move);
 
     try {
@@ -969,6 +996,23 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Relay live tile placement previews to other players
+  socket.on('tile-preview', (data) => {
+    const { gameId, playerId, isSpectator } = socket.data;
+    if (!gameId || isSpectator) return;
+
+    const game = games.get(gameId);
+    if (!game) return;
+
+    const pi = game.players.findIndex(p => p.id === playerId);
+    if (pi < 0) return;
+
+    socket.to(gameId).emit('opponent-preview', {
+      playerIndex: pi,
+      placements: data.placements || []
+    });
+  });
+
   // Make a move
   socket.on('make-move', async ({ placements }) => {
     try {
@@ -1651,6 +1695,20 @@ io.on('connection', (socket) => {
     console.log('Client disconnected:', socket.id);
 
     if (!gameId) return;
+
+    // Clear any tile previews from this player
+    if (!isSpectator) {
+      const game = games.get(gameId);
+      if (game) {
+        const pi = game.players.findIndex(p => p.id === playerId);
+        if (pi >= 0) {
+          socket.to(gameId).emit('opponent-preview', {
+            playerIndex: pi,
+            placements: []
+          });
+        }
+      }
+    }
 
     try {
       let game = games.get(gameId);
