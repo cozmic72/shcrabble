@@ -18,6 +18,8 @@ let currentVoteId = null;
 let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
 let pendingBlankPlacement = null; // Stores pending blank tile placement data
 let lastPlacementPosition = null; // Track last tile placement for double-click continuation
+let boardCursor = { row: 7, col: 7 }; // Keyboard cursor position on board
+let selectedRackIndex = null; // Index into player's rack for keyboard selection
 let lastMovePlacements = []; // Track placements from last move for highlighting
 let highlightFadeTimeout = null; // Timeout for fading highlight
 let watchedPlayerId = null; // For spectators: which player's rack to display
@@ -1076,6 +1078,18 @@ function updateBoard() {
       }
     }
   }
+
+  // Render keyboard cursor
+  if (boardCursor && playerIndex !== null) {
+    // Clear previous cursor
+    const prevCursor = boardDiv.querySelector('.keyboard-cursor');
+    if (prevCursor) prevCursor.classList.remove('keyboard-cursor');
+
+    const cursorSquare = boardDiv.querySelector(`.square[data-row="${boardCursor.row}"][data-col="${boardCursor.col}"]`);
+    if (cursorSquare) {
+      cursorSquare.classList.add('keyboard-cursor');
+    }
+  }
 }
 
 function handleGhostToRealConversion() {
@@ -1282,6 +1296,11 @@ function updateRack() {
     } else {
       // Spectator mode - tiles are not interactive
       tileDiv.style.cursor = 'default';
+    }
+
+    // Highlight keyboard-selected rack tile
+    if (selectedRackIndex === originalIndex) {
+      tileDiv.classList.add('rack-selected');
     }
 
     rackDiv.appendChild(tileDiv);
@@ -2432,6 +2451,242 @@ function recallTiles() {
   setTimeout(() => {
     isRecalling = false;
   }, longestDelay);
+}
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT') return;
+  if (document.querySelector('.dialog-overlay[style*="display: flex"]')) return;
+  if (!gameState || gameState.status !== 'active' || playerIndex === null) return;
+
+  handleKeyboardInput(e);
+});
+
+function handleKeyboardInput(e) {
+  const key = e.key;
+
+  // Number keys 1-9: select rack tile
+  if (key >= '1' && key <= '9') {
+    const idx = parseInt(key) - 1;
+    const rack = gameState.players[playerIndex].rack;
+    const usedIndices = new Set(currentPlacements.map(p => p.rackIndex));
+    if (idx < rack.length && !usedIndices.has(idx)) {
+      selectedRackIndex = (selectedRackIndex === idx) ? null : idx;
+      updateRack();
+    }
+    e.preventDefault();
+    return;
+  }
+
+  // Tab: cycle rack selection
+  if (key === 'Tab') {
+    const rack = gameState.players[playerIndex].rack;
+    if (rack.length > 0) {
+      if (selectedRackIndex === null) {
+        selectedRackIndex = findNextAvailableRackTile(-1);
+      } else {
+        selectedRackIndex = findNextAvailableRackTile(selectedRackIndex);
+      }
+      updateRack();
+    }
+    e.preventDefault();
+    return;
+  }
+
+  // Arrow keys / WASD: move cursor
+  let moved = false;
+  if (key === 'ArrowUp' || key === 'w' || key === 'W') {
+    boardCursor.row = Math.max(0, boardCursor.row - 1);
+    moved = true;
+  } else if (key === 'ArrowDown' || key === 's' || key === 'S') {
+    boardCursor.row = Math.min(14, boardCursor.row + 1);
+    moved = true;
+  } else if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
+    boardCursor.col = Math.max(0, boardCursor.col - 1);
+    moved = true;
+  } else if (key === 'ArrowRight' || key === 'd' || key === 'D') {
+    boardCursor.col = Math.min(14, boardCursor.col + 1);
+    moved = true;
+  }
+
+  if (moved) {
+    updateBoard();
+    e.preventDefault();
+    return;
+  }
+
+  // Space or Enter: place/pick up tile
+  if (key === ' ' || key === 'Enter') {
+    handleKeyboardPlacement();
+    e.preventDefault();
+    return;
+  }
+
+  // R: rotate selected tile
+  if (key === 'r' || key === 'R') {
+    if (selectedRackIndex !== null) {
+      rotateTile(selectedRackIndex);
+    }
+    e.preventDefault();
+    return;
+  }
+
+  // Escape: deselect or recall
+  if (key === 'Escape') {
+    if (selectedRackIndex !== null) {
+      selectedRackIndex = null;
+      updateRack();
+    } else if (currentPlacements.length > 0) {
+      recallTiles();
+    }
+    e.preventDefault();
+    return;
+  }
+}
+
+function handleKeyboardPlacement() {
+  const { row, col } = boardCursor;
+
+  // Check if there's already a ghost/current placement at this position
+  const existingIdx = currentPlacements.findIndex(p => p.row === row && p.col === col);
+
+  if (existingIdx !== -1) {
+    // Pick up the placed tile -- return it to rack
+    const placement = currentPlacements[existingIdx];
+    currentPlacements.splice(existingIdx, 1);
+    // If the picked-up tile was the selected one, keep selection; otherwise select it
+    selectedRackIndex = placement.rackIndex;
+    updateBoard();
+    updateRack();
+    updateGameUI();
+    validateCurrentMove();
+    emitTilePreview();
+    return;
+  }
+
+  // Check if the board cell is occupied (existing permanent tile)
+  if (gameState.board[row][col].letter !== null) {
+    return;
+  }
+
+  // Check if we have a selected rack tile
+  if (selectedRackIndex === null) return;
+
+  const rack = gameState.players[playerIndex].rack;
+  if (selectedRackIndex >= rack.length) return;
+
+  const tile = rack[selectedRackIndex];
+
+  // Check if this tile has already been placed elsewhere
+  const alreadyPlaced = currentPlacements.find(p => p.rackIndex === selectedRackIndex);
+  if (alreadyPlaced) return;
+
+  const isGhostPlacement = gameState.currentPlayerIndex !== playerIndex;
+
+  // For blank tiles, show the blank letter dialog
+  if (tile.isBlank) {
+    const rackIndex = selectedRackIndex;
+    pendingBlankPlacement = {
+      row,
+      col,
+      draggedTile: tile,
+      rackIndex: rackIndex,
+      isGhost: isGhostPlacement
+    };
+    showBlankLetterDialog();
+
+    // After blank dialog resolves, advance cursor and select next tile
+    const origSelectBlankLetter = selectBlankLetter;
+    const origPendingHandler = function(letter) {
+      origSelectBlankLetter(letter);
+      advanceCursorAfterPlacement();
+      selectedRackIndex = findNextAvailableRackTile(rackIndex);
+      updateBoard();
+      updateRack();
+    };
+    // Patch the letter grid buttons to use our handler
+    const letterGrid = document.getElementById('letter-grid');
+    const buttons = letterGrid.querySelectorAll('.letter-option');
+    buttons.forEach(btn => {
+      const newBtn = btn.cloneNode(true);
+      btn.parentNode.replaceChild(newBtn, btn);
+      newBtn.addEventListener('click', () => origPendingHandler(newBtn.textContent));
+    });
+    return;
+  }
+
+  // Determine display letter and points (accounting for rotation state)
+  const isRotated = tile.isRotatable && tile.isRotated;
+  const displayLetter = isRotated ? tile.rotatedLetter : tile.letter;
+  const displayPoints = isRotated ? tile.rotatedPoints : tile.points;
+
+  const placement = {
+    row,
+    col,
+    letter: displayLetter,
+    points: displayPoints,
+    isBlank: false,
+    rackIndex: selectedRackIndex,
+    isGhost: isGhostPlacement
+  };
+  if (isRotated) placement.isRotated = true;
+  currentPlacements.push(placement);
+
+  if (window.sounds) sounds.tilePlaced();
+
+  advanceCursorAfterPlacement();
+  selectedRackIndex = findNextAvailableRackTile(selectedRackIndex);
+
+  updateBoard();
+  updateRack();
+  updateGameUI();
+  validateCurrentMove();
+  emitTilePreview();
+}
+
+function advanceCursorAfterPlacement() {
+  if (currentPlacements.length < 2) {
+    // First tile -- advance right by default
+    boardCursor.col = Math.min(14, boardCursor.col + 1);
+    return;
+  }
+
+  // Determine direction from existing placements
+  const allSameRow = currentPlacements.every(p => p.row === currentPlacements[0].row);
+  const allSameCol = currentPlacements.every(p => p.col === currentPlacements[0].col);
+
+  if (allSameRow) {
+    boardCursor.col = Math.min(14, boardCursor.col + 1);
+  } else if (allSameCol) {
+    boardCursor.row = Math.min(14, boardCursor.row + 1);
+  }
+
+  // Skip occupied squares
+  while (boardCursor.row <= 14 && boardCursor.col <= 14 &&
+         gameState.board[boardCursor.row][boardCursor.col].letter !== null) {
+    if (allSameRow || currentPlacements.length < 2) {
+      boardCursor.col = Math.min(14, boardCursor.col + 1);
+    } else {
+      boardCursor.row = Math.min(14, boardCursor.row + 1);
+    }
+    if (boardCursor.row > 14 || boardCursor.col > 14) break;
+  }
+  // Clamp back to valid range
+  boardCursor.row = Math.min(14, boardCursor.row);
+  boardCursor.col = Math.min(14, boardCursor.col);
+}
+
+function findNextAvailableRackTile(afterIndex) {
+  const rack = gameState.players[playerIndex].rack;
+  const usedIndices = new Set(currentPlacements.map(p => p.rackIndex));
+
+  for (let i = afterIndex + 1; i < rack.length; i++) {
+    if (!usedIndices.has(i)) return i;
+  }
+  for (let i = 0; i <= afterIndex; i++) {
+    if (!usedIndices.has(i)) return i;
+  }
+  return null;
 }
 
 function passTurn() {
