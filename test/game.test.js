@@ -646,12 +646,13 @@ describe('Game - Bot management', () => {
     assert.throws(() => game.addBot('casual'), /Game is full/);
   });
 
-  it('addBot() rejects when game is locked', () => {
+  it('addBot() works even when game is locked (mid-game join)', () => {
     const game = makeGame();
     game.addPlayer('p1', 'Alice');
     game.addBot('casual');
     game.locked = true;
-    assert.throws(() => game.addBot('expert'), /Game is locked/);
+    game.addBot('expert');
+    assert.strictEqual(game.players.length, 3);
   });
 
   it('getState() includes isBot and botTier', () => {

@@ -992,8 +992,8 @@ io.on('connection', (socket) => {
         return;
       }
 
-      if (game.status !== 'waiting') {
-        socket.emit('error', { message: 'Game already started' });
+      if (game.status === 'completed') {
+        socket.emit('error', { message: 'Game is finished' });
         return;
       }
 

@@ -206,10 +206,6 @@ class Game {
       throw new Error('Unknown bot tier: ' + tierName);
     }
 
-    if (this.locked) {
-      throw new Error('Game is locked - first round is complete');
-    }
-
     if (this.players.length >= 4) {
       throw new Error('Game is full');
     }

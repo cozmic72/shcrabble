@@ -616,7 +616,10 @@ function updateTilesRemaining(count) {
   }
 }
 
+let highlightedPlayerIdx = null;
+
 function clearTileHighlights() {
+  highlightedPlayerIdx = null;
   document.querySelectorAll('.highlighted-tile').forEach(el => {
     el.classList.remove('highlighted-tile');
   });
@@ -624,6 +627,12 @@ function clearTileHighlights() {
 
 function highlightPlayerTiles(playerIdx) {
   clearTileHighlights();
+
+  if (highlightedPlayerIdx === playerIdx) {
+    return;
+  }
+
+  highlightedPlayerIdx = playerIdx;
 
   const squares = document.querySelectorAll('.square');
   squares.forEach(sq => {
@@ -633,12 +642,14 @@ function highlightPlayerTiles(playerIdx) {
       sq.classList.add('highlighted-tile');
     }
   });
-
-  // Clear on next click anywhere else (delay to avoid catching the current click)
-  setTimeout(() => {
-    document.addEventListener('click', clearTileHighlights, { once: true });
-  }, 50);
 }
+
+// Clear highlights when clicking outside player cards
+document.addEventListener('click', (e) => {
+  if (highlightedPlayerIdx === null) return;
+  if (e.target.closest('.player-card')) return;
+  clearTileHighlights();
+});
 
 function updateGameUI() {
   if (!gameState) return;
@@ -743,14 +754,11 @@ function updateGameUI() {
     leaveGameBtn.style.display = 'inline-block';
   }
 
-  // Show/hide bot controls (only in waiting state for the game owner)
+  // Show/hide bot controls (for game owner when room available)
   const botControls = document.getElementById('bot-controls');
   if (botControls) {
-    if (gameState.status === 'waiting' && isOwner && gameState.players.length < 4) {
-      botControls.style.display = 'block';
-    } else {
-      botControls.style.display = 'none';
-    }
+    const canAddBot = isOwner && gameState.players.length < 4 && gameState.status !== 'completed';
+    botControls.style.display = canAddBot ? 'block' : 'none';
   }
 }
 
