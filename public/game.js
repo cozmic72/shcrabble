@@ -634,10 +634,10 @@ function highlightPlayerTiles(playerIdx) {
     }
   });
 
-  // Clear on next click anywhere else
+  // Clear on next click anywhere else (delay to avoid catching the current click)
   setTimeout(() => {
     document.addEventListener('click', clearTileHighlights, { once: true });
-  }, 0);
+  }, 50);
 }
 
 function updateGameUI() {
