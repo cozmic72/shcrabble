@@ -252,7 +252,7 @@ function initSocket() {
     }
 
     // Show welcome dialog on first visit
-    const hideWelcome = localStorage.getItem('shcrabble-hide-welcome');
+    const hideWelcome = localStorage.getItem('shcrabble-hide-welcome-1.2');
     isReconnection = data.reconnected || false;
 
     if (!hideWelcome) {
@@ -3371,7 +3371,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function closeWelcomeDialog() {
     const dontShow = document.getElementById('dont-show-welcome').checked;
     if (dontShow) {
-      localStorage.setItem('shcrabble-hide-welcome', 'true');
+      localStorage.setItem('shcrabble-hide-welcome-1.2', 'true');
     }
     document.getElementById('welcome-dialog').style.display = 'none';
 
