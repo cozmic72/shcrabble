@@ -30,6 +30,8 @@ const opponentPreviews = new Map(); // playerIndex -> [{row, col, letter}]
 let touchDraggedElement = null;
 let touchClone = null;
 let touchStartPos = { x: 0, y: 0 };
+let touchStartTime = 0;
+let touchHasMoved = false;
 let touchCurrentTarget = null;
 
 // Pinch zoom support for board
@@ -1429,6 +1431,8 @@ function handleTouchStart(e) {
     x: e.touches[0].clientX,
     y: e.touches[0].clientY
   };
+  touchStartTime = Date.now();
+  touchHasMoved = false;
 
   // Store tile data
   draggedTile = {
@@ -1436,28 +1440,14 @@ function handleTouchStart(e) {
     points: parseInt(tile.dataset.points),
     isBlank: tile.dataset.isBlank === 'true',
     rackIndex: parseInt(tile.dataset.index),
-    isRotated: tile.dataset.isRotated === 'true'
+    isRotated: tile.dataset.isRotated === 'true',
+    isRotatable: tile.dataset.rotatedLetter !== undefined
   };
   draggedFromRack = true;
   rackDragSource = tile;
 
-  // Create a visual clone for dragging
-  touchClone = tile.cloneNode(true);
-  touchClone.style.position = 'fixed';
-  touchClone.style.zIndex = '10000';
-  touchClone.style.pointerEvents = 'none';
-  touchClone.style.opacity = '0.8';
-  touchClone.style.width = tile.offsetWidth + 'px';
-  touchClone.style.height = tile.offsetHeight + 'px';
-  touchClone.style.left = e.touches[0].clientX - tile.offsetWidth / 2 + 'px';
-  touchClone.style.top = e.touches[0].clientY - tile.offsetHeight / 2 + 'px';
-  document.body.appendChild(touchClone);
-
-  // Make original semi-transparent
-  tile.style.opacity = '0.3';
-
-  // Play pickup sound
-  if (window.sounds) sounds.tilePickup();
+  // Don't create clone immediately - wait to see if this is a tap or drag
+  // We'll create it in handleTouchMove if needed
 
   e.preventDefault();
 }
@@ -1474,6 +1464,8 @@ function handlePlacedTileTouchStart(e) {
     x: e.touches[0].clientX,
     y: e.touches[0].clientY
   };
+  touchStartTime = Date.now();
+  touchHasMoved = false;
 
   const row = parseInt(tile.dataset.row);
   const col = parseInt(tile.dataset.col);
@@ -1488,40 +1480,73 @@ function handlePlacedTileTouchStart(e) {
   };
   draggedFromRack = false;
 
-  // Create visual clone
-  touchClone = tile.cloneNode(true);
-  touchClone.style.position = 'fixed';
-  touchClone.style.zIndex = '10000';
-  touchClone.style.pointerEvents = 'none';
-  touchClone.style.opacity = '0.8';
-  touchClone.style.width = tile.offsetWidth + 'px';
-  touchClone.style.height = tile.offsetHeight + 'px';
-  touchClone.style.left = e.touches[0].clientX - tile.offsetWidth / 2 + 'px';
-  touchClone.style.top = e.touches[0].clientY - tile.offsetHeight / 2 + 'px';
-  document.body.appendChild(touchClone);
-
-  tile.style.opacity = '0.3';
+  // Don't create clone immediately - wait to see if this is a tap or drag
+  // We'll create it in handleTouchMove if needed
 
   e.preventDefault();
 }
 
 function handleTouchMove(e) {
-  if (!touchDraggedElement || !touchClone) return;
+  if (!touchDraggedElement) return;
 
-  // Update clone position
   const touch = e.touches[0];
-  touchClone.style.left = touch.clientX - touchClone.offsetWidth / 2 + 'px';
-  touchClone.style.top = touch.clientY - touchClone.offsetHeight / 2 + 'px';
+  const deltaX = touch.clientX - touchStartPos.x;
+  const deltaY = touch.clientY - touchStartPos.y;
+  const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
 
-  // Find element under touch
-  const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
-  touchCurrentTarget = elementUnderTouch;
+  // Consider it a drag if moved more than 10 pixels
+  const DRAG_THRESHOLD = 10;
+  if (distance > DRAG_THRESHOLD) {
+    touchHasMoved = true;
 
-  // Highlight drop target
-  document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
-  const square = elementUnderTouch?.closest('.square');
-  if (square) {
-    square.classList.add('drag-over');
+    // Create clone if not already created
+    if (!touchClone) {
+      touchClone = touchDraggedElement.cloneNode(true);
+      touchClone.style.position = 'fixed';
+      touchClone.style.zIndex = '10000';
+      touchClone.style.pointerEvents = 'none';
+      touchClone.style.opacity = '0.8';
+      touchClone.style.width = touchDraggedElement.offsetWidth + 'px';
+      touchClone.style.height = touchDraggedElement.offsetHeight + 'px';
+      document.body.appendChild(touchClone);
+
+      // Make original semi-transparent
+      touchDraggedElement.style.opacity = '0.3';
+
+      // Play pickup sound
+      if (window.sounds) sounds.tilePickup();
+    }
+  }
+
+  if (touchClone) {
+    // Update clone position
+    touchClone.style.left = touch.clientX - touchClone.offsetWidth / 2 + 'px';
+    touchClone.style.top = touch.clientY - touchClone.offsetHeight / 2 + 'px';
+
+    // Find element under touch
+    const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
+    touchCurrentTarget = elementUnderTouch;
+
+    // Highlight drop target
+    document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+    const square = elementUnderTouch?.closest('.square');
+    if (square) {
+      square.classList.add('drag-over');
+    }
+
+    // Handle rack reordering preview for touch
+    const rackElement = elementUnderTouch?.closest('#rack');
+    if (rackElement && draggedFromRack && rackDragSource && !draggedTile?.fromBoard) {
+      const rack = document.getElementById('rack');
+      const afterElement = getDragAfterElement(rack, touch.clientX);
+
+      // Live preview: temporarily insert dragged element at new position
+      if (afterElement == null) {
+        rack.appendChild(rackDragSource);
+      } else if (afterElement !== rackDragSource.nextSibling) {
+        rack.insertBefore(rackDragSource, afterElement);
+      }
+    }
   }
 
   e.preventDefault();
@@ -1539,13 +1564,27 @@ function handleTouchEnd(e) {
     touchClone = null;
   }
 
+  // Check if this was a tap (no movement) - handle rotation
+  if (!touchHasMoved && draggedFromRack && draggedTile?.isRotatable) {
+    rotateTile(draggedTile.rackIndex);
+
+    // Clean up
+    document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
+    touchDraggedElement = null;
+    draggedTile = null;
+    draggedFromRack = false;
+    rackDragSource = null;
+    touchCurrentTarget = null;
+    return;
+  }
+
   // Find drop target
   const touch = e.changedTouches[0];
   const elementUnderTouch = document.elementFromPoint(touch.clientX, touch.clientY);
 
   // Check if dropped on board square
   const square = elementUnderTouch?.closest('.square');
-  if (square && draggedTile) {
+  if (square && draggedTile && touchHasMoved) {
     const row = parseInt(square.dataset.row);
     const col = parseInt(square.dataset.col);
 
@@ -1605,7 +1644,7 @@ function handleTouchEnd(e) {
 
   // Check if dropped back on rack
   const rackElement = elementUnderTouch?.closest('#rack');
-  if (rackElement && draggedTile?.fromBoard) {
+  if (rackElement && draggedTile?.fromBoard && touchHasMoved) {
     // Remove placement from board
     const idx = currentPlacements.findIndex(p =>
       p.row === draggedTile.boardRow && p.col === draggedTile.boardCol
@@ -1617,6 +1656,11 @@ function handleTouchEnd(e) {
       validateCurrentMove();
       emitTilePreview();
     }
+  }
+
+  // Check if reordering tiles within rack
+  if (rackElement && draggedFromRack && touchHasMoved && !draggedTile?.fromBoard) {
+    handleTouchRackReorder(touch.clientX);
   }
 
   // Clean up
@@ -1745,6 +1789,31 @@ function handleRackDrop(e) {
 
   const rack = document.getElementById('rack');
   const afterElement = getDragAfterElement(rack, e.clientX);
+
+  if (afterElement == null) {
+    rack.appendChild(rackDragSource);
+  } else {
+    rack.insertBefore(rackDragSource, afterElement);
+  }
+
+  // Update the game state rack array to match the new DOM order
+  const rackTiles = [...rack.querySelectorAll('.rack-tile')];
+  const newRack = rackTiles.map(tileDiv => {
+    const index = parseInt(tileDiv.dataset.index);
+    return gameState.players[playerIndex].rack[index];
+  });
+  gameState.players[playerIndex].rack = newRack;
+
+  // Refresh the rack display to update data-index attributes
+  updateRack();
+}
+
+// Handle touch-based rack reordering
+function handleTouchRackReorder(touchX) {
+  if (!rackDragSource) return;
+
+  const rack = document.getElementById('rack');
+  const afterElement = getDragAfterElement(rack, touchX);
 
   if (afterElement == null) {
     rack.appendChild(rackDragSource);
