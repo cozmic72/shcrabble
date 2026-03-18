@@ -1061,6 +1061,9 @@ body {
     order: -1;
     width: 100%;
     margin-bottom: 10px;
+    position: relative;
+    z-index: 10;
+    background: white;
   }
 
   #players-panel h2 {
@@ -1100,13 +1103,15 @@ body {
     font-size: 0.8em;
   }
 
-  /* Make board container touch-zoomable */
+  /* Make board container touch-zoomable, clipped so it doesn't bleed behind rack */
   #board-container {
     width: 100%;
     overflow: auto;
     -webkit-overflow-scrolling: touch;
     touch-action: pan-x pan-y pinch-zoom;
     position: relative;
+    max-height: 60vh;
+    clip-path: inset(0);
   }
 
   #board-container-zoom {
@@ -1136,10 +1141,13 @@ body {
     font-size: 0.6em;
   }
 
-  /* Rack container */
+  /* Rack container — solid background above the board on zoom */
   #rack-container {
     width: 100%;
     padding: 10px;
+    position: relative;
+    z-index: 10;
+    background: white;
   }
 
   #rack-container h3 {
