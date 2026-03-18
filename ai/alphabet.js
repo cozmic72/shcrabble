@@ -21,18 +21,24 @@ const COMPOUND_SPLITS = {
 
 const EXCLUDED_POS = ['ZZ0', 'UNC'];
 
+const SHAVIAN_VOWELS = new Set([...'𐑦𐑰𐑧𐑱𐑨𐑲𐑩𐑳𐑴𐑪𐑵𐑶𐑷𐑭𐑺𐑻𐑫𐑬']);
+const SHAVIAN_COMPOUND_VOWELS = new Set([...SHAVIAN_VOWELS, ...'𐑼𐑽𐑸𐑹𐑾']);
+const ROMAN_VOWELS = new Set(['a', 'e', 'i', 'o', 'u']);
+
 const ALPHABETS = {
   split: {
     name: 'split',
     letters: BASIC_LETTERS,
     splits: Object.assign({}, COMPOUND_SPLITS),
     tiles: 'tiles.csv',
+    vowels: SHAVIAN_VOWELS,
   },
   compound: {
     name: 'compound',
     letters: BASIC_LETTERS.concat(COMPOUND_LETTERS),
     splits: {},
     tiles: 'tiles-compound.csv',
+    vowels: SHAVIAN_COMPOUND_VOWELS,
   },
   rotatable: {
     name: 'rotatable',
@@ -45,6 +51,7 @@ const ALPHABETS = {
       ['𐑙','𐑣'], ['𐑤','𐑮'], ['𐑧','𐑪'], ['𐑨','𐑩'],
       ['𐑫','𐑵'], ['𐑬','𐑶'], ['𐑭','𐑷'],
     ],
+    vowels: SHAVIAN_VOWELS,
   },
   'rotatable-extended': {
     name: 'rotatable-extended',
@@ -60,6 +67,7 @@ const ALPHABETS = {
       ['𐑙','𐑣'], ['𐑤','𐑮'], ['𐑧','𐑪'], ['𐑨','𐑩'],
       ['𐑫','𐑵'], ['𐑬','𐑶'], ['𐑭','𐑷'],
     ],
+    vowels: SHAVIAN_VOWELS,
   },
   roman: {
     name: 'roman',
@@ -67,6 +75,7 @@ const ALPHABETS = {
     splits: {},
     tiles: 'tiles-roman.csv',
     field: 'Latn',
+    vowels: ROMAN_VOWELS,
   },
   'split-extended': {
     name: 'split-extended',
@@ -76,6 +85,7 @@ const ALPHABETS = {
       '𐑻': '\u{1049F}𐑮',
     }),
     tiles: 'tiles-extended.csv',
+    vowels: SHAVIAN_VOWELS,
   },
 };
 
