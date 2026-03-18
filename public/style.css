@@ -331,6 +331,18 @@ body {
               inset 0 -1px 0 rgba(0, 0, 0, 0.1);
 }
 
+.breakdown-row .tile.tile-with-pts {
+  position: relative;
+}
+
+.breakdown-row .tile .wpts {
+  position: absolute;
+  bottom: 1px;
+  right: 2px;
+  font-size: 0.4em;
+  font-weight: normal;
+}
+
 .breakdown-row .tile.compound {
   background: linear-gradient(135deg, #ffb3b3 0%, #ff9999 50%, #ff7f7f 100%);
   border-color: #cc5555;
