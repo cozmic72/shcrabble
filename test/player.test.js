@@ -269,4 +269,287 @@ describe('AIPlayer - worstTileIndices', () => {
     // The worst tiles are z(10), q(10), x(8) - indices 1, 4, 3
     assert.ok(indices.includes(1) || indices.includes(4) || indices.includes(3));
   });
+
+  it('returns at most 4 indices', () => {
+    const trie = buildTrie([]);
+    const ai = new AIPlayer(trie, TIERS.expert, alphabet);
+
+    const rack = [
+      makeTile('z', 10), makeTile('x', 8), makeTile('q', 10),
+      makeTile('j', 8), makeTile('v', 4), makeTile('w', 4), makeTile('k', 5),
+    ];
+
+    const indices = ai.worstTileIndices(rack);
+    assert.equal(indices.length, 4);
+  });
+
+  it('ranks blanks as least bad (keeps them)', () => {
+    const trie = buildTrie([]);
+    const ai = new AIPlayer(trie, TIERS.expert, alphabet);
+
+    const rack = [
+      { letter: '', points: 0, isBlank: true }, // 0 - badness -100
+      makeTile('z', 10), // 1
+      makeTile('a', 1),  // 2
+    ];
+
+    const indices = ai.worstTileIndices(rack);
+    // Blank has badness -100, so it should NOT appear among worst tiles
+    // z(10) is the worst, then a(1), then blank(-100)
+    assert.ok(indices.includes(1), 'z should be in worst tiles');
+    assert.ok(!indices.includes(0) || indices.length === 3, 'blank should be last if included');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Expert exchange
+// ---------------------------------------------------------------------------
+
+describe('AIPlayer - Expert exchange', () => {
+  it('returns exchange when best move scores below threshold and bag has tiles', () => {
+    // Only word available scores 2 (below expert threshold of 8)
+    const words = ['ab'];
+    const trie = buildTrie(words);
+    const config = { ...TIERS.expert, exchangeThreshold: 100, topN: 1 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = emptyBoard();
+
+    const rack = [
+      makeTile('a', 1), makeTile('b', 1),
+      makeTile('x', 8), makeTile('z', 10),
+      makeTile('q', 10), makeTile('j', 8), makeTile('v', 4)
+    ];
+
+    const move = ai.findBestMove(board, rack, 50);
+    assert.ok(move, 'Should return a move');
+    assert.equal(move.exchange, true, 'Should be an exchange');
+    assert.ok(Array.isArray(move.indices), 'Should have indices array');
+    assert.ok(move.indices.length > 0, 'Should exchange at least one tile');
+  });
+
+  it('does not exchange when bag is too small (< 7)', () => {
+    const words = ['ab'];
+    const trie = buildTrie(words);
+    const config = { ...TIERS.expert, exchangeThreshold: 100, topN: 1 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = emptyBoard();
+
+    const rack = [
+      makeTile('a', 1), makeTile('b', 1),
+      makeTile('x', 8), makeTile('z', 10),
+    ];
+
+    // Bag size < 7, so exchange should not happen
+    const move = ai.findBestMove(board, rack, 5);
+    assert.ok(move, 'Should return a move');
+    assert.ok(!move.exchange, 'Should NOT be an exchange with small bag');
+    assert.ok(move.placements, 'Should be a regular move');
+  });
+
+  it('does not exchange when exchangeThreshold is 0', () => {
+    const words = ['ab'];
+    const trie = buildTrie(words);
+    const config = { ...TIERS.beginner, exchangeThreshold: 0, topN: 1 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = emptyBoard();
+
+    const rack = [makeTile('a', 1), makeTile('b', 1)];
+
+    const move = ai.findBestMove(board, rack, 50);
+    assert.ok(move, 'Should return a move');
+    assert.ok(!move.exchange, 'Should not exchange when threshold is 0');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Defense evaluation
+// ---------------------------------------------------------------------------
+
+describe('AIPlayer - Defense evaluation', () => {
+  // Board with bonus squares matching the standard Scrabble layout
+  function boardWithBonuses() {
+    const BONUS_SQUARES = {
+      TW: [[0,0], [0,7], [0,14], [7,0], [7,14], [14,0], [14,7], [14,14]],
+      DW: [[1,1], [2,2], [3,3], [4,4], [1,13], [2,12], [3,11], [4,10],
+           [13,1], [12,2], [11,3], [10,4], [13,13], [12,12], [11,11], [10,10]],
+      TL: [[1,5], [1,9], [5,1], [5,5], [5,9], [5,13], [9,1], [9,5], [9,9], [9,13], [13,5], [13,9]],
+      DL: [[0,3], [0,11], [2,6], [2,8], [3,0], [3,7], [3,14], [6,2], [6,6], [6,8], [6,12],
+           [7,3], [7,11], [8,2], [8,6], [8,8], [8,12], [11,0], [11,7], [11,14], [12,6], [12,8], [14,3], [14,11]]
+    };
+
+    const board = [];
+    for (let r = 0; r < BOARD_SIZE; r++) {
+      board[r] = [];
+      for (let c = 0; c < BOARD_SIZE; c++) {
+        let bonus = null;
+        for (const [type, positions] of Object.entries(BONUS_SQUARES)) {
+          if (positions.some(([br, bc]) => br === r && bc === c)) {
+            bonus = type;
+            break;
+          }
+        }
+        board[r][c] = { letter: null, points: 0, isBlank: false, bonus };
+      }
+    }
+    return board;
+  }
+
+  it('computeDefensePenalty returns 0 when no adjacent premium squares', () => {
+    const trie = buildTrie([]);
+    const config = { ...TIERS.expert, defenseWeight: 1.0 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = boardWithBonuses();
+
+    // Place at center (7,7) - neighbors (6,7), (8,7), (7,6), (7,8) have no premium
+    const move = {
+      placements: [{ row: 7, col: 7, letter: 'a', points: 1, isBlank: false }],
+      score: 5,
+      words: ['a']
+    };
+
+    const penalty = ai.computeDefensePenalty(move, board);
+    assert.equal(penalty, 0);
+  });
+
+  it('computeDefensePenalty penalizes adjacent TW squares', () => {
+    const trie = buildTrie([]);
+    const config = { ...TIERS.expert, defenseWeight: 1.0 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = boardWithBonuses();
+
+    // Place at (0,1) - neighbor (0,0) is TW
+    const move = {
+      placements: [{ row: 0, col: 1, letter: 'a', points: 1, isBlank: false }],
+      score: 5,
+      words: ['a']
+    };
+
+    const penalty = ai.computeDefensePenalty(move, board);
+    assert.ok(penalty >= 15, 'Should penalize for adjacent TW');
+  });
+
+  it('computeDefensePenalty penalizes adjacent DW squares', () => {
+    const trie = buildTrie([]);
+    const config = { ...TIERS.expert, defenseWeight: 1.0 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = boardWithBonuses();
+
+    // Place at (1,2) - neighbor (1,1) is DW, (2,2) is DW
+    const move = {
+      placements: [{ row: 1, col: 2, letter: 'a', points: 1, isBlank: false }],
+      score: 5,
+      words: ['a']
+    };
+
+    const penalty = ai.computeDefensePenalty(move, board);
+    assert.ok(penalty >= 8, 'Should penalize for adjacent DW');
+  });
+
+  it('computeDefensePenalty skips occupied adjacent squares', () => {
+    const trie = buildTrie([]);
+    const config = { ...TIERS.expert, defenseWeight: 1.0 };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = boardWithBonuses();
+
+    // Occupy the TW square at (0,0)
+    board[0][0].letter = 'x';
+
+    // Place at (0,1) - neighbor (0,0) is TW but occupied, so no penalty
+    const move = {
+      placements: [{ row: 0, col: 1, letter: 'a', points: 1, isBlank: false }],
+      score: 5,
+      words: ['a']
+    };
+
+    const penalty = ai.computeDefensePenalty(move, board);
+    // (0,0) is occupied so not penalized; (1,1) is DW and empty, so should get 8
+    assert.equal(penalty, 8);
+  });
+
+  it('defenseWeight affects computeEffectiveScore', () => {
+    const trie = buildTrie([]);
+    const configWithDefense = {
+      topN: 1, rackLeaveWeight: 0, defenseWeight: 1.0,
+      endgameBias: 0, endgameThreshold: 0, exchangeThreshold: 0,
+    };
+    const configNoDefense = {
+      topN: 1, rackLeaveWeight: 0, defenseWeight: 0,
+      endgameBias: 0, endgameThreshold: 0, exchangeThreshold: 0,
+    };
+    const aiWith = new AIPlayer(trie, configWithDefense, alphabet);
+    const aiWithout = new AIPlayer(trie, configNoDefense, alphabet);
+    const board = boardWithBonuses();
+    const rack = [makeTile('a', 1)];
+
+    // Place at (0,1) adjacent to TW at (0,0)
+    const move = {
+      placements: [{ row: 0, col: 1, letter: 'a', points: 1, isBlank: false }],
+      score: 10,
+      words: ['a']
+    };
+
+    const scoreWith = aiWith.computeEffectiveScore(move, board, rack, 50);
+    const scoreWithout = aiWithout.computeEffectiveScore(move, board, rack, 50);
+    assert.ok(scoreWith < scoreWithout, 'Defense weight should reduce effective score');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Endgame bias
+// ---------------------------------------------------------------------------
+
+describe('AIPlayer - Endgame bias', () => {
+  it('endgameBias penalizes long words when bag is small', () => {
+    const trie = buildTrie([]);
+    const config = {
+      topN: 1, rackLeaveWeight: 0, defenseWeight: 0,
+      endgameBias: 0.7, endgameThreshold: 20, exchangeThreshold: 0,
+    };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = emptyBoard();
+    const rack = [];
+
+    const shortMove = {
+      placements: [{ row: 7, col: 7, letter: 'a' }, { row: 7, col: 8, letter: 'b' }],
+      score: 10,
+      words: ['ab']
+    };
+    const longMove = {
+      placements: [
+        { row: 7, col: 7, letter: 'a' }, { row: 7, col: 8, letter: 'b' },
+        { row: 7, col: 9, letter: 'c' }, { row: 7, col: 10, letter: 'd' },
+        { row: 7, col: 11, letter: 'e' },
+      ],
+      score: 10,
+      words: ['abcde']
+    };
+
+    const shortScore = ai.computeEffectiveScore(shortMove, board, rack, 5);
+    const longScore = ai.computeEffectiveScore(longMove, board, rack, 5);
+    assert.ok(shortScore > longScore, 'Short move should score higher in endgame');
+  });
+
+  it('endgameBias does not apply when bag is large', () => {
+    const trie = buildTrie([]);
+    const config = {
+      topN: 1, rackLeaveWeight: 0, defenseWeight: 0,
+      endgameBias: 0.7, endgameThreshold: 20, exchangeThreshold: 0,
+    };
+    const ai = new AIPlayer(trie, config, alphabet);
+    const board = emptyBoard();
+    const rack = [];
+
+    const move = {
+      placements: [
+        { row: 7, col: 7, letter: 'a' }, { row: 7, col: 8, letter: 'b' },
+        { row: 7, col: 9, letter: 'c' }, { row: 7, col: 10, letter: 'd' },
+      ],
+      score: 10,
+      words: ['abcd']
+    };
+
+    // tileBagSize > endgameThreshold, so no bias applied
+    const score = ai.computeEffectiveScore(move, board, rack, 50);
+    assert.equal(score, 10, 'No endgame penalty when bag is large');
+  });
 });

@@ -8,37 +8,30 @@ A multiplayer Scrabble game using the Shavian alphabet with real-time WebSocket 
 - 2-4 player multiplayer with real-time WebSocket connections
 - Standard 15x15 Scrabble board with bonus squares (DW, TW, DL, TL)
 - Dictionary validation using Readlex (Shavian/English)
+- AI bot opponents at four difficulty levels
+- Live opponent tile preview (see tiles placed before submission)
+- Click a player to highlight their tiles on the board
 - Spectator mode with rack viewing
 - Player reconnection support
-- Turn management with pass/exchange options
 - 50 point bonus for using all tiles in rack
-- Automatic game end suggestion after 6 consecutive scoreless turns
 
-### Game Modes
-- Casual rules (2-4 players)
-- Tournament rules (2 players only)
+### Tile Modes
+- **Rotation** (default): 15 rotationally symmetric letter pairs share flippable tiles (27 types). Click to rotate.
+- **Standard**: All 42 Shavian letters as separate tiles. Compounds split.
+- **Extended**: Either mode can add yea and oevre — rare high-value letters replacing err (𐑺) and air (𐑻).
+- Custom tile distributions per mode
+
+### AI Bot Opponents
+- Four tiers: Beginner, Casual, Intermediate, Expert
+- Rack management and endgame strategy at higher tiers
+- Can be added before or during a game
+- Tile-by-tile move animation
+
+### Game Rules
+- Casual rules (2-4 players) or Tournament rules (2 players)
 - Configurable rack size (5-12 tiles, default 9)
-- Custom tile distributions
-- Compound letter mode (split vs. compound tiles)
 - Optional accumulative timer (default 25 minutes per player)
-  - Live countdown display
-  - Auto-pause on disconnect
-  - Owner pause/unpause control
-
-### Tile Options
-- Default: 42 Shavian letters split mode + blanks
-- Compound mode: Includes 𐑼, 𐑽, 𐑸, 𐑹, 𐑾, 𐑿 as single tiles
-- Custom distributions via game creation
-
-### Voting System
-- Optional voting on word validity (casual mode default)
-- Players vote to accept/reject challenged words
-- Majority rule resolution
-
-### Administration
-- Game owner controls (remove players, end game, delete game, transfer ownership)
-- Invite link sharing
-- Persistent game state (reconnect to active games)
+- Voting on word validity
 
 ### Internationalization
 - English and Shavian (𐑖𐑱𐑝𐑾𐑯) UI translations
@@ -50,131 +43,45 @@ A multiplayer Scrabble game using the Shavian alphabet with real-time WebSocket 
 - **Frontend**: Plain HTML/CSS/JavaScript
 - **Database**: SQLite3
 - **Dictionary**: Readlex (Shavian/English dictionary)
+- **AI**: Anchor-based move generator with trie dictionary
 
 ## Project Structure
 
 ```
 shcrabble/
-├── server/           # Server-side code (game logic, WebSocket handlers, database)
-├── public/           # Client-side code (UI, game client)
-├── data/             # Tile distributions (CSV)
+├── server/           # Game logic, WebSocket handlers, database
+├── public/           # Client-side UI
+├── ai/               # AI engine (trie, move generator, player tiers, alphabet config)
+├── data/             # Tile distributions (CSV) and dictionary
+├── test/             # Test suite (node:test)
 └── database/         # Database schema
 ```
 
-## Setup Instructions
-
-### Prerequisites
-
-- Node.js (v14 or higher)
-- Readlex dictionary at `~/Code/shavian-info/readlex/readlex.json`
-
-### Installation
-
-1. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-2. **Start the server**
-   ```bash
-   npm start
-   ```
-
-   The server will run on `http://localhost:3000`
-   Database will be created automatically at `shcrabble.db`
-
-### Testing Locally
-
-1. Open `http://localhost:3000/shcrabble`
-2. Create a new game or join an existing one
-3. Share the invite link with other players
-
-## Apache Deployment
-
-### 1. Install and run as a service using PM2
+## Setup
 
 ```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start the application
-pm2 start server/index.js --name shcrabble
-
-# Save the process list
-pm2 save
-
-# Set up PM2 to start on boot
-pm2 startup
+npm install
+npm start
+# → http://localhost:3000/shcrabble
 ```
 
-### 2. Configure Apache as a reverse proxy
+## Testing
 
-```apache
-# Enable required modules (run as root)
-a2enmod proxy
-a2enmod proxy_http
-a2enmod proxy_wstunnel
-systemctl restart apache2
-
-# Add to your VirtualHost configuration
-<Location /shcrabble>
-    ProxyPass http://localhost:3000/shcrabble
-    ProxyPassReverse http://localhost:3000/shcrabble
-</Location>
-
-# WebSocket support
-<Location /shcrabble/socket.io>
-    ProxyPass ws://localhost:3000/socket.io
-    ProxyPassReverse ws://localhost:3000/socket.io
-</Location>
+```bash
+node --test test/*.test.js
+node --test --experimental-test-coverage test/*.test.js
 ```
 
 ## Tile Distribution
 
-Tiles are defined in `data/tiles.csv` and `data/tiles-compound.csv`.
+Tiles are defined in CSV files in `data/`. Point values are calibrated via Monte Carlo game simulation.
 
-**Split mode (default)**: 42 Shavian letters + 2 blanks
-- Compound letters split: 𐑼→𐑩𐑮, 𐑽→𐑦𐑩𐑮, 𐑸→𐑭𐑮, 𐑹→𐑷𐑮, 𐑾→𐑦𐑩, 𐑿→𐑘𐑵
-
-**Compound mode**: 48 Shavian letters + 2 blanks
-- Includes compound letters as single tiles
-
-## Dictionary
-
-Uses Readlex dictionary at `~/Code/shavian-info/readlex/readlex.json`.
-
-Filters out:
-- Single letters (POS tag: ZZ0)
-- Abbreviations (all caps, periods)
-- Unclassified words (POS tag: UNC)
-
-Compound letters in dictionary are automatically normalized based on game mode.
-
-## Game Rules
-
-Standard Scrabble rules:
-- 15x15 board
-- Configurable rack size (default 9 tiles for Shavian)
-- 2-4 players (casual) or 2 players (tournament)
-- Standard bonus squares
-- 50 point bonus for using all rack tiles
-- First word must cover center square
-- Optional timer: accumulative time bank per player
-
-## Development
-
-### Environment Variables
-
-Create `.env` file with:
-```
-PORT=3000
-DICT_PATH=/path/to/readlex.json
-```
-
-Defaults:
-- Port: 3000
-- Dictionary: `~/Code/shavian-info/readlex/readlex.json`
-- Database: `./shcrabble.db` (SQLite)
+| Mode | File | Tiles | Letters |
+|------|------|-------|---------|
+| Rotation | tiles-rotatable.csv | 27 types | 42 letters (15 paired) |
+| Rotation+ | tiles-rotatable-extended.csv | 27 types | + yea/oevre |
+| Standard | tiles.csv | 42 types | 42 letters |
+| Standard+ | tiles-extended.csv | 42 types | + yea/oevre |
 
 ## License
 

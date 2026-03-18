@@ -802,3 +802,317 @@ describe('Game - tileMode', () => {
     assert.ok(game.tileBag.length > 0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// exchangeTiles()
+// ---------------------------------------------------------------------------
+
+describe('Game - exchangeTiles()', () => {
+  it('valid exchange swaps tiles from rack', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    const player = game.players[0];
+    const originalTiles = [...player.rack];
+    const originalBagSize = game.tileBag.length;
+
+    // Exchange first two tiles
+    game.exchangeTiles(0, [0, 1]);
+
+    // Rack size should remain the same
+    assert.equal(player.rack.length, originalTiles.length);
+    // Bag size should remain the same (returned 2, drew 2)
+    assert.equal(game.tileBag.length, originalBagSize);
+  });
+
+  it('rejects exchange when not your turn', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.throws(
+      () => game.exchangeTiles(1, [0]),
+      /Not your turn/
+    );
+  });
+
+  it('rejects exchange when bag has fewer than 7 tiles', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    // Drain the bag to fewer than 7 tiles
+    game.tileBag.splice(0, game.tileBag.length - 5);
+    assert.ok(game.tileBag.length < 7);
+
+    assert.throws(
+      () => game.exchangeTiles(0, [0]),
+      /Not enough tiles/
+    );
+  });
+
+  it('rejects exchange with empty indices', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.throws(
+      () => game.exchangeTiles(0, []),
+      /Must select at least one tile/
+    );
+  });
+
+  it('rejects exchange with invalid tile index', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.throws(
+      () => game.exchangeTiles(0, [99]),
+      /Invalid tile index/
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Timer methods
+// ---------------------------------------------------------------------------
+
+describe('Game - Timer methods', () => {
+  it('startTurnTimer() sets turnStartTime when game is active', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+    // Game becomes active when 2 players are added; timer already started
+    assert.ok(game.turnStartTime !== null, 'turnStartTime should be set');
+  });
+
+  it('stopTurnTimer() accumulates time to current player', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    const player = game.players[0];
+    assert.equal(player.timeUsed, 0);
+
+    // Simulate that the turn started 5 seconds ago
+    game.turnStartTime = Date.now() - 5000;
+    game.stopTurnTimer();
+
+    assert.ok(player.timeUsed >= 4, 'Should accumulate approximately 5 seconds');
+    assert.ok(player.timeUsed <= 6, 'Should accumulate approximately 5 seconds');
+    assert.equal(game.turnStartTime, null, 'turnStartTime should be cleared');
+  });
+
+  it('getCurrentTurnTime() returns null when timer is not enabled', () => {
+    const game = makeGame({ timerEnabled: false });
+    addTwoPlayers(game);
+
+    assert.equal(game.getCurrentTurnTime(), null);
+  });
+
+  it('getCurrentTurnTime() returns remaining time when timer is enabled', () => {
+    const game = makeGame({ timerEnabled: true, timeLimit: 300 });
+    addTwoPlayers(game);
+
+    const remaining = game.getCurrentTurnTime();
+    assert.ok(remaining !== null);
+    assert.ok(remaining > 295 && remaining <= 300, 'Should have close to full time remaining');
+  });
+
+  it('getCurrentTurnTime() accounts for accumulated timeUsed', () => {
+    const game = makeGame({ timerEnabled: true, timeLimit: 300 });
+    addTwoPlayers(game);
+
+    game.players[0].timeUsed = 100;
+    const remaining = game.getCurrentTurnTime();
+    assert.ok(remaining <= 200, 'Should subtract accumulated time');
+  });
+
+  it('pauseTimer() stops accumulating time', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    game.turnStartTime = Date.now() - 3000;
+    game.pauseTimer();
+
+    assert.equal(game.timerPaused, true);
+    assert.equal(game.turnStartTime, null);
+    assert.ok(game.players[0].timeUsed >= 2);
+  });
+
+  it('resumeTimer() restarts the turn timer', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    game.pauseTimer();
+    assert.equal(game.turnStartTime, null);
+
+    game.resumeTimer();
+    assert.equal(game.timerPaused, false);
+    assert.ok(game.turnStartTime !== null, 'turnStartTime should be set after resume');
+  });
+
+  it('endGameByTimeout() completes the game', () => {
+    const game = makeGame({ timerEnabled: true, timeLimit: 10 });
+    addTwoPlayers(game);
+
+    game.endGameByTimeout();
+    assert.equal(game.status, 'completed');
+    assert.equal(game.timerPaused, true);
+    assert.equal(game.turnStartTime, null);
+  });
+
+  it('stopTurnTimer() triggers timeout when player exceeds time limit', () => {
+    const game = makeGame({ timerEnabled: true, timeLimit: 10 });
+    addTwoPlayers(game);
+
+    // The timer starts paused when timerEnabled is true; unpause it
+    game.timerPaused = false;
+
+    // Simulate player has used 8 seconds, turn started 5 seconds ago
+    game.players[0].timeUsed = 8;
+    game.turnStartTime = Date.now() - 5000;
+    game.stopTurnTimer();
+
+    // 8 + 5 = 13 >= 10, should trigger timeout
+    assert.equal(game.status, 'completed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// nextTurn()
+// ---------------------------------------------------------------------------
+
+describe('Game - nextTurn()', () => {
+  it('advances player index and wraps around with 2 players', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.equal(game.currentPlayerIndex, 0);
+    game.nextTurn();
+    assert.equal(game.currentPlayerIndex, 1);
+    game.nextTurn();
+    assert.equal(game.currentPlayerIndex, 0);
+  });
+
+  it('advances correctly with 3 players', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'Alice');
+    game.addPlayer('p2', 'Bob');
+    game.addPlayer('p3', 'Carol');
+
+    assert.equal(game.currentPlayerIndex, 0);
+    game.nextTurn();
+    assert.equal(game.currentPlayerIndex, 1);
+    game.nextTurn();
+    assert.equal(game.currentPlayerIndex, 2);
+    game.nextTurn();
+    assert.equal(game.currentPlayerIndex, 0);
+  });
+
+  it('advances correctly with 4 players', () => {
+    const game = makeGame();
+    game.addPlayer('p1', 'A');
+    game.addPlayer('p2', 'B');
+    game.addPlayer('p3', 'C');
+    game.addPlayer('p4', 'D');
+
+    for (let i = 0; i < 4; i++) {
+      assert.equal(game.currentPlayerIndex, i);
+      game.nextTurn();
+    }
+    assert.equal(game.currentPlayerIndex, 0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Player disconnect/reconnect
+// ---------------------------------------------------------------------------
+
+describe('Game - Player disconnect/reconnect', () => {
+  it('disconnectPlayer() marks player as not connected', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    const result = game.disconnectPlayer('p1');
+    assert.equal(result, true);
+    assert.equal(game.players[0].connected, false);
+  });
+
+  it('disconnectPlayer() returns false for unknown player', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.equal(game.disconnectPlayer('unknown'), false);
+  });
+
+  it('reconnectPlayer() updates player id and marks connected', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    game.disconnectPlayer('p1');
+    const player = game.reconnectPlayer('p1-new', 'Alice');
+    assert.ok(player);
+    assert.equal(player.id, 'p1-new');
+    assert.equal(player.connected, true);
+  });
+
+  it('reconnectPlayer() returns null for unknown name', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    assert.equal(game.reconnectPlayer('px', 'Nobody'), null);
+  });
+
+  it('reconnectPlayer() transfers ownership when owner reconnects with new id', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+    assert.equal(game.ownerId, 'p1');
+
+    game.reconnectPlayer('p1-new', 'Alice');
+    assert.equal(game.ownerId, 'p1-new');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spectator management
+// ---------------------------------------------------------------------------
+
+describe('Game - Spectator management', () => {
+  it('addSpectator() and removeSpectator() work', () => {
+    const game = makeGame();
+    game.addSpectator('s1', 'Spectator1');
+    assert.equal(game.spectators.length, 1);
+
+    const removed = game.removeSpectator('s1');
+    assert.ok(removed);
+    assert.equal(game.spectators.length, 0);
+  });
+
+  it('removeSpectator() returns null for unknown id', () => {
+    const game = makeGame();
+    assert.equal(game.removeSpectator('unknown'), null);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markPlayerAsLeft
+// ---------------------------------------------------------------------------
+
+describe('Game - markPlayerAsLeft()', () => {
+  it('marks player as left and transfers ownership', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    const result = game.markPlayerAsLeft('p1');
+    assert.ok(result);
+    assert.equal(result.player.hasLeft, true);
+    assert.equal(result.wasOwner, true);
+    assert.equal(result.newOwner.id, 'p2');
+    assert.equal(game.ownerId, 'p2');
+  });
+
+  it('sets game to waiting when less than 2 active players remain', () => {
+    const game = makeGame();
+    addTwoPlayers(game);
+
+    game.markPlayerAsLeft('p1');
+    game.markPlayerAsLeft('p2');
+    assert.equal(game.status, 'waiting');
+  });
+});
