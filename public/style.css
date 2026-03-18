@@ -344,6 +344,7 @@ body {
 }
 
 /* Tutorial pagination */
+.tutorial { padding: 0 16px; }
 .tutorial-page { display: none; min-height: 200px; }
 .tutorial-page[data-page="1"] { display: block; }
 .tutorial-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0 5px; border-top: 1px solid #eee; margin-top: 15px; }
