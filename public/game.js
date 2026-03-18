@@ -16,6 +16,7 @@ let exchangeMode = false;
 let tilesToExchange = [];
 let currentVoteId = null;
 let pendingGameCreatedDialog = false; // Flag to show game-created dialog after welcome
+let tutorialPage = 1;
 let pendingBlankPlacement = null; // Stores pending blank tile placement data
 let lastPlacementPosition = null; // Track last tile placement for double-click continuation
 let boardCursor = { row: 7, col: 7 }; // Keyboard cursor position on board
@@ -256,7 +257,9 @@ function initSocket() {
 
     if (!hideWelcome) {
       document.getElementById('welcome-content').innerHTML = i18n.getWelcome();
+      tutorialPage = 1;
       document.getElementById('welcome-dialog').style.display = 'flex';
+      setTimeout(updateTutorialPage, 0);
     } else if (isOwner && !isReconnection) {
       // Only show game-created dialog for owner when first creating, not when reconnecting
       document.getElementById('game-created-dialog').style.display = 'flex';
@@ -3363,21 +3366,44 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Welcome dialog handlers
-  document.getElementById('welcome-close-btn').addEventListener('click', () => {
+  // Tutorial / welcome dialog (tutorialPage is module-level for cross-scope access)
+
+  function closeWelcomeDialog() {
     const dontShow = document.getElementById('dont-show-welcome').checked;
     if (dontShow) {
       localStorage.setItem('shcrabble-hide-welcome', 'true');
     }
     document.getElementById('welcome-dialog').style.display = 'none';
 
-    // If game-created dialog is pending, show it now (but not for reconnections)
     const isOwner = gameState && playerId === gameState.ownerId;
     if (pendingGameCreatedDialog || (isOwner && !isReconnection)) {
       document.getElementById('game-created-dialog').style.display = 'flex';
       pendingGameCreatedDialog = false;
     }
-  });
+  }
+
+  function updateTutorialPage() {
+    document.querySelectorAll('.tutorial-page').forEach(p => {
+      p.style.display = parseInt(p.dataset.page) === tutorialPage ? 'block' : 'none';
+    });
+    document.querySelectorAll('.tutorial-dots .dot').forEach((d, i) => {
+      d.classList.toggle('active', i === tutorialPage - 1);
+    });
+    const prev = document.querySelector('.tutorial-prev');
+    const next = document.querySelector('.tutorial-next');
+    const pageCount = document.querySelectorAll('.tutorial-page').length;
+    if (prev) prev.style.visibility = tutorialPage === 1 ? 'hidden' : 'visible';
+    if (next) next.textContent = tutorialPage === pageCount ? 'Get Started!' : 'Next →';
+  }
+
+  window.tutorialNext = function() {
+    const pageCount = document.querySelectorAll('.tutorial-page').length;
+    if (tutorialPage < pageCount) { tutorialPage++; updateTutorialPage(); }
+    else { closeWelcomeDialog(); }
+  };
+  window.tutorialPrev = function() {
+    if (tutorialPage > 1) { tutorialPage--; updateTutorialPage(); }
+  };
 
   // Custom tile distribution handlers
   setupCustomTileEditor();

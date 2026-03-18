@@ -343,6 +343,20 @@ body {
   font-weight: normal;
 }
 
+/* Tutorial pagination */
+.tutorial-page { display: none; min-height: 200px; }
+.tutorial-page[data-page="1"] { display: block; }
+.tutorial-nav { display: flex; justify-content: space-between; align-items: center; padding: 15px 0 5px; border-top: 1px solid #eee; margin-top: 15px; }
+.tutorial-prev, .tutorial-next { background: #667eea; color: white; border: none; padding: 8px 20px; border-radius: 4px; cursor: pointer; font-size: 0.95em; min-width: 100px; }
+.tutorial-prev:hover, .tutorial-next:hover { background: #5a6fd6; }
+.tutorial-dots { display: flex; gap: 8px; }
+.tutorial-dots .dot { width: 10px; height: 10px; border-radius: 50%; background: #ddd; transition: background 0.2s; }
+.tutorial-dots .dot.active { background: #667eea; }
+kbd { background: #f4f4f4; border: 1px solid #ccc; border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 0.9em; }
+.shortcut-table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+.shortcut-table td { padding: 6px; border-bottom: 1px solid #eee; }
+.shortcut-table td:first-child { white-space: nowrap; width: 45%; }
+
 .breakdown-row .tile.compound {
   background: linear-gradient(135deg, #ffb3b3 0%, #ff9999 50%, #ff7f7f 100%);
   border-color: #cc5555;
