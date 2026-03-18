@@ -33,6 +33,8 @@ let touchStartPos = { x: 0, y: 0 };
 let touchStartTime = 0;
 let touchHasMoved = false;
 let touchCurrentTarget = null;
+let lastTapTime = 0;
+let lastTapTarget = null;
 
 // Pinch zoom support for board
 let boardScale = 1;
@@ -1564,9 +1566,27 @@ function handleTouchEnd(e) {
     touchClone = null;
   }
 
-  // Check if this was a tap (no movement) - handle rotation
-  if (!touchHasMoved && draggedFromRack && draggedTile?.isRotatable) {
-    rotateTile(draggedTile.rackIndex);
+  // Check if this was a tap (no movement)
+  if (!touchHasMoved && draggedFromRack) {
+    const currentTime = Date.now();
+    const timeSinceLastTap = currentTime - lastTapTime;
+    const isSameTile = lastTapTarget === touchDraggedElement;
+
+    // Check for double-tap (within 300ms on the same tile)
+    if (timeSinceLastTap < 300 && isSameTile) {
+      // Double-tap detected - place tile in next position
+      handleTileDoubleClick(draggedTile.rackIndex);
+      lastTapTime = 0;
+      lastTapTarget = null;
+    } else {
+      // Single tap - handle rotation if tile is rotatable, otherwise just record the tap
+      if (draggedTile?.isRotatable) {
+        rotateTile(draggedTile.rackIndex);
+      }
+      // Record this tap for potential double-tap detection
+      lastTapTime = currentTime;
+      lastTapTarget = touchDraggedElement;
+    }
 
     // Clean up
     document.querySelectorAll('.square').forEach(sq => sq.classList.remove('drag-over'));
