@@ -110,7 +110,7 @@
   "useRotation": "Rotation (tiles can be flipped)",
   "tileMode": "Tile Mode",
   "splitMode": "Standard (42 tiles)",
-  "rotationMode": "Rotation (27 flippable tiles)",
+  "rotationMode": "Rotation (27 tiles, 15 flippable)",
   "splitExtendedMode": "Standard+ (with yea & oevre)",
   "rotationExtendedMode": "Rotation+ (with yea & oevre)",
   "addBot": "Add Bot",
