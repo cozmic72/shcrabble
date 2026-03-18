@@ -584,6 +584,30 @@ function updateTilesRemaining(count) {
   }
 }
 
+function clearTileHighlights() {
+  document.querySelectorAll('.highlighted-tile').forEach(el => {
+    el.classList.remove('highlighted-tile');
+  });
+}
+
+function highlightPlayerTiles(playerIdx) {
+  clearTileHighlights();
+
+  const squares = document.querySelectorAll('.square');
+  squares.forEach(sq => {
+    const row = parseInt(sq.dataset.row);
+    const col = parseInt(sq.dataset.col);
+    if (gameState && gameState.board[row][col].placedBy === playerIdx) {
+      sq.classList.add('highlighted-tile');
+    }
+  });
+
+  // Clear on next click anywhere else
+  setTimeout(() => {
+    document.addEventListener('click', clearTileHighlights, { once: true });
+  }, 0);
+}
+
 function updateGameUI() {
   if (!gameState) return;
 
@@ -825,12 +849,20 @@ function updatePlayersList() {
         // Switch to watching this player
         watchedPlayerId = player.id;
         updateGameUI();
+        highlightPlayerTiles(idx);
       });
 
       // Highlight the currently watched player
       if (watchedPlayerId === player.id) {
         card.style.border = '3px solid #667eea';
       }
+    } else {
+      // For players: click to highlight that player's tiles on the board
+      card.style.cursor = 'pointer';
+      card.addEventListener('click', (e) => {
+        if (e.target.closest('.remove-player-btn')) return;
+        highlightPlayerTiles(idx);
+      });
     }
 
     playersList.appendChild(card);

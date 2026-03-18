@@ -872,6 +872,13 @@ body {
   pointer-events: none;
 }
 
+/* Highlight player tiles on click */
+.square.highlighted-tile {
+  outline: 3px solid rgba(66, 135, 245, 0.8);
+  outline-offset: -2px;
+  z-index: 5;
+}
+
 /* Highlight last move */
 .square.last-move-highlight {
   box-shadow: 0 0 0 3px #4CAF50, 0 0 15px rgba(76, 175, 80, 0.6);

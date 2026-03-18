@@ -182,7 +182,8 @@ class Game {
       for (let j = 0; j < BOARD_SIZE; j++) {
         board[i][j] = {
           letter: null,
-          bonus: this.getBonusType(i, j)
+          bonus: this.getBonusType(i, j),
+          placedBy: null
         };
       }
     }
@@ -502,6 +503,7 @@ class Game {
     placements.forEach(p => {
       this.board[p.row][p.col].letter = p.letter;
       this.board[p.row][p.col].isBlank = p.isBlank || false;
+      this.board[p.row][p.col].placedBy = playerIndex;
       // For rotated tiles, use the rotated points value
       if (p.isRotated) {
         const rackTile = player.rack.find((t, i) =>
